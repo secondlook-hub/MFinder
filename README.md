@@ -26,7 +26,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
 - **File Properties** — 속성 dialog with size, type, dates, and permissions
 - **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
-- **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs, sidebar tree, and clipboard stack. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기
+- **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs, sidebar tree, and clipboard stack. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install

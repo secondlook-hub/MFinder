@@ -150,6 +150,20 @@ struct FileTableView: NSViewRepresentable {
                 coord.suppressSelectionNotification = true
                 tableView.selectRowIndexes(indices, byExtendingSelection: false)
                 coord.suppressSelectionNotification = false
+                // Scroll newly-set selection into view and take keyboard
+                // focus so the user can immediately press Enter / arrow keys
+                // / Cmd+C on the just-pasted (or just-dropped) items.
+                if let first = indices.first {
+                    tableView.scrollRowToVisible(first)
+                    // Hand keyboard focus to the table so the user can
+                    // immediately use the just-selected row — but only if a
+                    // text editor (search bar, inline rename field) isn't
+                    // currently active; that would be focus theft.
+                    let isTextEditing = (tableView.window?.firstResponder as? NSText) != nil
+                    if !isTextEditing, tableView.window?.firstResponder !== tableView {
+                        tableView.window?.makeFirstResponder(tableView)
+                    }
+                }
             }
         }
 

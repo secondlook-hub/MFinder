@@ -19,10 +19,45 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
 
     @Published private(set) var stack: [ClipboardEntry] = []
 
-    /// True only when MFinder's own clipboard stack has items. System
-    /// pasteboard URLs (set by other apps) don't enable paste UIs unless they
-    /// have been brought into our stack via ⌘C / ⌘X.
-    var hasContent: Bool { !stack.isEmpty }
+    /// Bumped whenever the app comes to the foreground. Serves as a SwiftUI
+    /// dependency hook for `hasContent` so that views update when another
+    /// MFinder process (or any other app) puts URLs onto the system
+    /// pasteboard — without this, a freshly launched second instance's
+    /// "붙여넣기" button stays disabled because its own `stack` is empty.
+    @Published private(set) var pasteboardSnapshot: Int = 0
+
+    private var becomeActiveToken: NSObjectProtocol?
+
+    private init() {
+        becomeActiveToken = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.pasteboardSnapshot &+= 1
+        }
+    }
+
+    deinit {
+        if let token = becomeActiveToken {
+            NotificationCenter.default.removeObserver(token)
+        }
+    }
+
+    /// True if there's something to paste — either our local stack has items
+    /// or the system pasteboard carries file URLs (from another instance or
+    /// any external app). Reading the pasteboard here lets cross-instance
+    /// copy/paste work: instance A copies, instance B reads what A wrote.
+    var hasContent: Bool {
+        if !stack.isEmpty { return true }
+        return systemPasteboardHasFileURLs
+    }
+
+    private var systemPasteboardHasFileURLs: Bool {
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: opts) as? [URL]
+        return !(urls?.isEmpty ?? true)
+    }
 
     /// Convenience: URLs currently in the stack, preserving insertion order.
     var pending: [URL] { stack.map(\.url) }

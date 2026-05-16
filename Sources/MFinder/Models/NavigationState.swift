@@ -166,6 +166,10 @@ final class NavigationState: ObservableObject {
     private var history: [URL] = []
     private var forwardStack: [URL] = []
     private var loadGeneration: Int = 0
+    /// Selection to apply on the *next successful* reload, surviving any
+    /// intervening reload that gets cancelled by a later one (e.g. an FSEvent
+    /// reload firing right after a paste-triggered reload(thenSelect:)).
+    private var pendingSelection: Set<URL>?
 
     // Search infrastructure
     private var metadataQuery: NSMetadataQuery?
@@ -249,6 +253,7 @@ final class NavigationState: ObservableObject {
         forwardStack.removeAll()
         currentURL = target
         selectedItems.removeAll()
+        pendingSelection = nil    // navigating away invalidates any in-flight selection
         reload()
         // Reveal the destination in the sidebar tree synchronously — symlink /
         // alias jumps land outside the previously-expanded subtree, so we need
@@ -262,6 +267,7 @@ final class NavigationState: ObservableObject {
         forwardStack.append(currentURL)
         currentURL = prev
         selectedItems.removeAll()
+        pendingSelection = nil
         reload()
     }
 
@@ -271,6 +277,7 @@ final class NavigationState: ObservableObject {
         history.append(currentURL)
         currentURL = next
         selectedItems.removeAll()
+        pendingSelection = nil
         reload()
     }
 
@@ -292,6 +299,13 @@ final class NavigationState: ObservableObject {
         let myGen = loadGeneration
         let url = currentURL
         let showHidden = self.showHidden
+        // Record the desired selection outside the async closure so it
+        // survives a follow-up reload (e.g. one triggered by an FSEvent
+        // hitting the destination folder right after a paste) cancelling
+        // *this* reload's completion via the loadGeneration guard.
+        if let sel = newSelection {
+            pendingSelection = sel
+        }
         isLoading = true
         Task.detached(priority: .userInitiated) {
             let result: Result<[FileItem], Error>
@@ -308,10 +322,16 @@ final class NavigationState: ObservableObject {
                 case .success(let raw):
                     self.items = self.sorted(raw)
                     self.errorMessage = nil
-                    if let target = newSelection {
+                    if let target = self.pendingSelection {
                         let standardized = Set(target.map { $0.standardizedFileURL })
                         let present = self.items.filter { standardized.contains($0.url.standardizedFileURL) }
-                        self.selectedItems = Set(present.map { $0.url })
+                        if !present.isEmpty {
+                            self.selectedItems = Set(present.map { $0.url })
+                            // Only clear once the target items actually
+                            // showed up — otherwise a follow-up reload
+                            // (FSEvent batching, etc.) can still apply it.
+                            self.pendingSelection = nil
+                        }
                     }
                 case .failure(let err):
                     self.items = []
