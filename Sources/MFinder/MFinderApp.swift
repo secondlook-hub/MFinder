@@ -4,10 +4,12 @@ import AppKit
 @main
 struct MFinderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var updateChecker = UpdateChecker()
 
     var body: some Scene {
         WindowGroup("MFinder") {
             ContentView()
+                .environmentObject(updateChecker)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -42,6 +44,11 @@ struct MFinderApp: App {
                 Button("위로") {
                     NotificationCenter.default.post(name: .mfinderGoUp, object: nil)
                 }.keyboardShortcut(.upArrow, modifiers: [.command])
+            }
+            CommandGroup(replacing: .help) {
+                Button("업데이트 확인…") {
+                    Task { await updateChecker.checkForUpdates(manual: true) }
+                }
             }
         }
     }

@@ -1,7 +1,9 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @StateObject private var tabs = TabsState()
+    @EnvironmentObject var updateChecker: UpdateChecker
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +36,30 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderPrevTab)) { _ in
             tabs.prevTab()
+        }
+        .task {
+            // Auto-check GitHub Releases on launch. Silent on failure.
+            await updateChecker.checkForUpdates()
+        }
+        .alert("업데이트 사용 가능", isPresented: $updateChecker.updateAvailable) {
+            if let downloadURL = updateChecker.downloadURL {
+                Button("다운로드") {
+                    NSWorkspace.shared.open(downloadURL)
+                }
+            }
+            if let releaseURL = updateChecker.releaseURL {
+                Button("릴리즈 보기") {
+                    NSWorkspace.shared.open(releaseURL)
+                }
+            }
+            Button("나중에", role: .cancel) {}
+        } message: {
+            Text("MFinder \(updateChecker.latestVersion) 버전이 출시되었습니다.\n(현재 버전: \(updateChecker.currentVersion))")
+        }
+        .alert("최신 버전 사용 중", isPresented: $updateChecker.upToDate) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("MFinder \(updateChecker.currentVersion)이(가) 최신 버전입니다.")
         }
     }
 }
