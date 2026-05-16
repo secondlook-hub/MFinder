@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>MFinder</string>
+    <key>CFBundleDisplayName</key>
+    <string>MFinder</string>
+    <key>CFBundleExecutable</key>
+    <string>MFinder</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.miunsi.MFinder</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+    <key>CFBundleVersion</key>
+    <string>1.1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.1</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>MFinder needs access to browse your Desktop folder.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>MFinder needs access to browse your Documents folder.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>MFinder needs access to browse your Downloads folder.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>MFinder needs access to browse external volumes.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MFinder uses Finder to move files to the Trash so they are recoverable.</string>
+</dict>
+</plist>

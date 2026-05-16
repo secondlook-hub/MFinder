@@ -1,0 +1,17 @@
+# Build artifacts
+.build/
+build/
+DerivedData/
+*.app/
+*.dmg
+
+# Xcode
+*.xcuserdata
+xcuserdata/
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+
+# Claude
+.claude/
