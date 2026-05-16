@@ -141,6 +141,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         private var syncedPinnedURLs: [URL] = []
         private var syncedRenamingURL: URL?
         private var suppressSelectionNotification = false
+        private var volumeMountToken: NSObjectProtocol?
+        private var volumeUnmountToken: NSObjectProtocol?
 
         // Click-after-pause rename — same pattern as FileNSTableView.
         private var pendingRenameRow: Int = -1
@@ -165,6 +167,9 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             if let m = renameMouseMonitor {
                 NSEvent.removeMonitor(m)
             }
+            let ws = NSWorkspace.shared.notificationCenter
+            if let t = volumeMountToken   { ws.removeObserver(t) }
+            if let t = volumeUnmountToken { ws.removeObserver(t) }
         }
 
         // The fixed top-level items.
@@ -414,6 +419,33 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.applyState() }
                 .store(in: &cancellables)
+
+            // Mount / unmount notifications arrive on NSWorkspace's own
+            // notification center, not the default one. Reload just the
+            // 내 PC section so newly-mounted DMGs / external disks show up
+            // immediately and unmounted ones disappear without a relaunch.
+            let ws = NSWorkspace.shared.notificationCenter
+            volumeMountToken = ws.addObserver(
+                forName: NSWorkspace.didMountNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.reloadThisPCSection()
+            }
+            volumeUnmountToken = ws.addObserver(
+                forName: NSWorkspace.didUnmountNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.reloadThisPCSection()
+            }
+        }
+
+        private func reloadThisPCSection() {
+            guard let ov = outlineView else { return }
+            let item = SidebarItem.section(.thisPC)
+            ov.reloadItem(item, reloadChildren: true)
+            ov.expandItem(item)
         }
 
         func applyState() {
@@ -752,12 +784,50 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             menu.addItem(blockItem("Finder에서 보기") {
                 FileSystemService.shared.revealInFinder(url)
             })
+            if Self.isEjectableVolume(url) {
+                menu.addItem(.separator())
+                menu.addItem(blockItem("꺼내기") { [weak self] in
+                    self?.eject(url)
+                })
+            }
             menu.addItem(.separator())
             menu.addItem(blockItem("경로 복사") {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(url.path, forType: .string)
             })
+        }
+
+        /// True if `url` is a mounted volume that can be unmounted/ejected —
+        /// i.e. it's directly under `/Volumes/` and isn't the boot disk.
+        private static func isEjectableVolume(_ url: URL) -> Bool {
+            let std = url.standardizedFileURL
+            let path = std.path
+            // Directly under /Volumes/.
+            guard path.hasPrefix("/Volumes/"),
+                  std.deletingLastPathComponent().path == "/Volumes" else {
+                return false
+            }
+            // Skip the boot disk's `/Volumes/Macintosh HD` symlink.
+            let vals = try? std.resourceValues(forKeys: [.volumeIsRootFileSystemKey])
+            if vals?.volumeIsRootFileSystem == true { return false }
+            return true
+        }
+
+        private func eject(_ url: URL) {
+            do {
+                try NSWorkspace.shared.unmountAndEjectDevice(at: url)
+                // didUnmountNotification handles the sidebar refresh; if the
+                // currently-shown folder lived on the volume, fall back to
+                // the home directory so the file list doesn't keep pointing
+                // at a vanished path.
+                if nav.currentURL.path.hasPrefix(url.path + "/") ||
+                   nav.currentURL.standardizedFileURL == url.standardizedFileURL {
+                    nav.navigate(to: FileManager.default.homeDirectoryForCurrentUser)
+                }
+            } catch {
+                presentAlert("꺼내기 실패", error.localizedDescription)
+            }
         }
 
         private func createAliasInParent(of folder: URL) {
