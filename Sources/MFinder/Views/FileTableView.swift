@@ -907,6 +907,16 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             menu.addItem(block("폴더에서 새 VS Code 열기") { [weak self] in
                 self?.openInEditor(target.url, bundleId: "com.microsoft.VSCode")
             })
+            // Add/remove this folder from the sidebar's 즐겨찾기 section.
+            if PinnedFoldersService.shared.isPinned(target.url) {
+                menu.addItem(block("즐겨찾기에서 제거") {
+                    PinnedFoldersService.shared.unpin(target.url)
+                })
+            } else {
+                menu.addItem(block("즐겨찾기에 추가") {
+                    PinnedFoldersService.shared.pin(target.url)
+                })
+            }
         } else {
             // 연결 프로그램 submenu
             let appsItem = NSMenuItem(title: "연결 프로그램", action: nil, keyEquivalent: "")

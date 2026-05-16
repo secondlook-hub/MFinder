@@ -138,6 +138,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         private var syncedCurrentPath: String = ""
         private var syncedExpanded: Set<URL> = []
         private var syncedChildrenCache: [URL: [URL]] = [:]
+        private var syncedPinnedURLs: [URL] = []
         private var syncedRenamingURL: URL?
         private var suppressSelectionNotification = false
 
@@ -426,6 +427,17 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
             let childrenChanged = syncedChildrenCache != tree.childrenCache
             let expansionChanged = syncedExpanded != tree.expandedURLs
+            let pinnedChanged = syncedPinnedURLs != PinnedFoldersService.shared.pinnedURLs
+
+            // Pinning / unpinning a folder updates the favorites section
+            // (built from quickAccessLocations()), so reload just that node
+            // when the pin set changes. Doing this independently of the
+            // childrenCache reload path avoids tearing the whole tree apart.
+            if !isRenameActive && pinnedChanged {
+                ov.reloadItem(SidebarItem.section(.favorites), reloadChildren: true)
+                ov.expandItem(SidebarItem.section(.favorites))
+                syncedPinnedURLs = PinnedFoldersService.shared.pinnedURLs
+            }
 
             if !isRenameActive && childrenChanged {
                 ov.beginUpdates()
@@ -725,11 +737,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             })
             menu.addItem(.separator())
             if PinnedFoldersService.shared.isPinned(url) {
-                menu.addItem(blockItem("빠른 액세스에서 핀 해제") {
+                menu.addItem(blockItem("즐겨찾기에서 제거") {
                     PinnedFoldersService.shared.unpin(url)
                 })
             } else if isPinnable {
-                menu.addItem(blockItem("빠른 액세스에 핀 고정") {
+                menu.addItem(blockItem("즐겨찾기에 추가") {
                     PinnedFoldersService.shared.pin(url)
                 })
             }
