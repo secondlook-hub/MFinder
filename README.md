@@ -25,6 +25,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Permission Guidance** — TCC-protected folders (OneDrive / Google Drive / Dropbox under `~/Library/CloudStorage`) trigger a clear dialog with a one-click jump to System Settings → Privacy & Security → Full Disk Access
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
 - **File Properties** — 속성 dialog with size, type, dates, and permissions
+- **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install
@@ -93,6 +94,7 @@ MFinder/
     │   ├── ArchiveService.swift             # Bandizip integration
     │   ├── SearchSnippetService.swift       # Inline match preview
     │   ├── QuickLookCoordinator.swift
+    │   ├── UpdateChecker.swift              # GitHub Releases update checker
     │   └── PreferencesService.swift
     └── Views/
         ├── AddressBar.swift
