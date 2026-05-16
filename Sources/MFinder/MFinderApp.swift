@@ -15,6 +15,9 @@ struct MFinderApp: App {
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             CommandGroup(replacing: .newItem) {
+                Button("새 창") {
+                    launchNewMFinderInstance()
+                }.keyboardShortcut("n", modifiers: .command)
                 Button("새 탭") {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
                 }.keyboardShortcut("t", modifiers: .command)
@@ -83,6 +86,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         installKeyMonitor()
+    }
+
+    /// Adds custom items to the Dock icon's right-click menu. Custom items
+    /// appear above the system-provided "Options", "Show All Windows",
+    /// "Hide", and "Quit" entries.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "새 창 열기", action: #selector(openNewInstanceFromDock(_:)), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func openNewInstanceFromDock(_ sender: Any?) {
+        // Dock menu actions arrive on the main thread but as a nonisolated
+        // selector entry point; bounce into MainActor to call the
+        // @MainActor helper.
+        MainActor.assumeIsolated {
+            launchNewMFinderInstance()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -170,4 +193,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+}
+
+/// Launches an additional MFinder process side-by-side with the current one.
+/// Uses `createsNewApplicationInstance` so LaunchServices spawns a fresh
+/// process (equivalent to running `open -n MFinder.app`) instead of just
+/// activating the already-running instance, giving each window its own state,
+/// clipboard stack, sidebar tree, and tabs.
+@MainActor
+func launchNewMFinderInstance() {
+    let config = NSWorkspace.OpenConfiguration()
+    config.createsNewApplicationInstance = true
+    config.activates = true
+    NSWorkspace.shared.openApplication(
+        at: Bundle.main.bundleURL,
+        configuration: config,
+        completionHandler: { _, error in
+            if let error {
+                NSLog("MFinder.newInstance: openApplication failed: \(error.localizedDescription)")
+            }
+        }
+    )
 }
