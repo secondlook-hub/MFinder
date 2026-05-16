@@ -10,6 +10,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Tabs** — Multi-tab browsing with drag-free reordering shortcuts (Cmd+T / Cmd+W, Cmd+Shift+]/[ to switch)
 - **View Modes** — Details (native NSTableView), List, Small / Medium / Large / Extra-Large Icons, Tiles, Content
 - **NSOutlineView Sidebar** — 즐겨찾기 (favorites with pinning), 내 PC (volumes), 네트워크 sections under a single outline view; inline folder rename via AppKit's `editColumn` field editor
+- **Multi-Select in Tree** — Cmd-click / Shift-click multiple folders in the sidebar to copy, cut, trash, pin, alias, or reveal them all at once. Single-target actions (rename, paste-into, eject) stay scoped to the right-clicked row
 - **Live Volume List** — Mounted DMGs, external drives, and network shares appear in the 내 PC section the moment they mount; right-click → 꺼내기 to unmount
 - **Inline Rename** — Right-click → "이름 바꾸기", F2, or click-and-pause on an already-selected row. Mouse must stay on the row for the pause-to-rename to activate; cancels if the cursor leaves
 - **Address Bar** — Breadcrumb path navigation, editable URL field, jump to any ancestor

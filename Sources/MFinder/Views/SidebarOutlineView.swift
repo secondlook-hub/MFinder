@@ -84,7 +84,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         outline.usesAlternatingRowBackgroundColors = false
         outline.gridStyleMask = []
         outline.intercellSpacing = NSSize(width: 0, height: 0)
-        outline.allowsMultipleSelection = false
+        outline.allowsMultipleSelection = true
         outline.allowsEmptySelection = true
         outline.backgroundColor = .white
         outline.floatsGroupRows = false
@@ -270,17 +270,29 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         func outlineViewSelectionDidChange(_ notification: Notification) {
             guard !suppressSelectionNotification, let ov = outlineView else { return }
-            let row = ov.selectedRow
-            guard row >= 0, let node = ov.item(atRow: row) as? SidebarItem else { return }
+            // Update the published multi-selection mirror (skipping section
+            // header rows that don't have a URL).
+            let urls = ov.selectedRowIndexes.compactMap { idx -> URL? in
+                guard let node = ov.item(atRow: idx) as? SidebarItem else { return nil }
+                return node.folderURL
+            }
+            if nav.sidebarSelectionURLs != urls {
+                nav.sidebarSelectionURLs = urls
+            }
+            AppFocus.area = .sidebar
+            // Only navigate when exactly one row is selected, so extending
+            // the selection (Cmd-click / Shift-click) doesn't kick the file
+            // list to whichever row was added last.
+            guard ov.selectedRowIndexes.count == 1,
+                  let row = ov.selectedRowIndexes.first,
+                  let node = ov.item(atRow: row) as? SidebarItem else { return }
             switch node {
             case .favoriteRoot(let qa), .pcRoot(let qa):
-                AppFocus.area = .sidebar
                 if nav.currentURL.standardizedFileURL.path != qa.url.standardizedFileURL.path {
                     nav.navigate(to: qa.url)
                 }
                 tree.expand(qa.url)
             case .folder(let url):
-                AppFocus.area = .sidebar
                 if nav.currentURL.standardizedFileURL.path != url.standardizedFileURL.path {
                     nav.navigate(to: url)
                 }
@@ -532,6 +544,13 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             guard curPath != syncedCurrentPath else { return }
             syncedCurrentPath = curPath
             if let item = locateItem(for: nav.currentURL), let row = rowIndex(for: item) {
+                // Preserve a user-built multi-selection if it already
+                // contains the new currentURL — only the visible scroll
+                // moves. Otherwise reset to just that single row.
+                if ov.selectedRowIndexes.contains(row) {
+                    ov.scrollRowToVisible(row)
+                    return
+                }
                 suppressSelectionNotification = true
                 ov.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
                 ov.scrollRowToVisible(row)
@@ -703,6 +722,22 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         // MARK: - Context menu
 
+        /// Returns the URLs the right-click menu should operate on. If the
+        /// clicked row is one of the already-selected rows, the whole
+        /// selection is targeted; otherwise just the clicked row.
+        private func actionURLs(for clickedURL: URL) -> [URL] {
+            guard let ov = outlineView else { return [clickedURL] }
+            let selected = ov.selectedRowIndexes.compactMap { idx -> URL? in
+                guard let node = ov.item(atRow: idx) as? SidebarItem else { return nil }
+                return node.folderURL
+            }
+            let clickedStd = clickedURL.standardizedFileURL
+            if selected.contains(where: { $0.standardizedFileURL == clickedStd }), selected.count > 1 {
+                return selected
+            }
+            return [clickedURL]
+        }
+
         func menuNeedsUpdate(_ menu: NSMenu) {
             menu.removeAllItems()
             guard let ov = outlineView else { return }
@@ -729,13 +764,18 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         }
 
         private func buildItemMenu(_ menu: NSMenu, url: URL, isFolder: Bool, isPinnable: Bool) {
+            let urls = actionURLs(for: url)
+            let isMulti = urls.count > 1
+            // Open-in-tab / open-in-new-window stay single-target (the
+            // clicked row); spawning N tabs from a multi-selection would be
+            // surprising. Same for expand/collapse and rename.
             menu.addItem(blockItem("새 탭에서 열기") {
                 NotificationCenter.default.post(name: .mfinderNewTab, object: url)
             })
             menu.addItem(blockItem("새 창에서 열기") {
                 FileSystemService.shared.openItem(url)
             })
-            if isFolder, let ov = outlineView,
+            if isFolder, !isMulti, let ov = outlineView,
                let item = locateItem(for: url) {
                 let title = ov.isItemExpanded(item) ? "접기" : "확장"
                 menu.addItem(blockItem(title) {
@@ -747,54 +787,81 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 })
             }
             menu.addItem(.separator())
-            menu.addItem(blockItem("복사")     { ClipboardService.shared.copy([url]) })
-            menu.addItem(blockItem("잘라내기") { ClipboardService.shared.cut([url]) })
+            // Copy / cut respect the multi-selection.
+            let copyTitle = isMulti ? "복사 (\(urls.count)개)" : "복사"
+            let cutTitle  = isMulti ? "잘라내기 (\(urls.count)개)" : "잘라내기"
+            menu.addItem(blockItem(copyTitle) { ClipboardService.shared.copy(urls) })
+            menu.addItem(blockItem(cutTitle)  { ClipboardService.shared.cut(urls) })
+            // Paste destination must be single — into the right-clicked
+            // folder, regardless of how many rows are selected.
             let pasteItem = blockItem("붙여넣기 (이 폴더 안으로)") { [weak self] in
                 guard let self = self else { return }
                 pasteIntoFolderShared(url, nav: self.nav, tree: self.tree)
             }
             pasteItem.isEnabled = ClipboardService.shared.hasContent
             menu.addItem(pasteItem)
-            menu.addItem(blockItem("바로 가기 만들기") { [weak self] in
-                self?.createAliasInParent(of: url)
-            })
-            menu.addItem(.separator())
-            menu.addItem(blockItem("이름 바꾸기") { [weak self] in
-                AppFocus.area = .sidebar
-                self?.nav.renamingURL = url
-            })
-            menu.addItem(blockItem("휴지통으로 이동") { [weak self] in
+            menu.addItem(blockItem(isMulti ? "바로 가기 만들기 (\(urls.count)개)" : "바로 가기 만들기") { [weak self] in
                 guard let self = self else { return }
-                trashTreeFolder(url, nav: self.nav, tree: self.tree)
+                for u in urls { self.createAliasInParent(of: u) }
             })
             menu.addItem(.separator())
-            if PinnedFoldersService.shared.isPinned(url) {
-                menu.addItem(blockItem("즐겨찾기에서 제거") {
-                    PinnedFoldersService.shared.unpin(url)
+            // Rename is one folder at a time.
+            if !isMulti {
+                menu.addItem(blockItem("이름 바꾸기") { [weak self] in
+                    AppFocus.area = .sidebar
+                    self?.nav.renamingURL = url
                 })
-            } else if isPinnable {
-                menu.addItem(blockItem("즐겨찾기에 추가") {
-                    PinnedFoldersService.shared.pin(url)
-                })
+            }
+            let trashTitle = isMulti ? "휴지통으로 이동 (\(urls.count)개)" : "휴지통으로 이동"
+            menu.addItem(blockItem(trashTitle) { [weak self] in
+                guard let self = self else { return }
+                trashTreeFolders(urls, nav: self.nav, tree: self.tree)
+            })
+            menu.addItem(.separator())
+            // Pinning: when multi-selected, decide by majority — if any of
+            // the selected URLs are already pinned, the menu offers "remove
+            // from favorites" for all of them; otherwise "add to favorites".
+            if isMulti {
+                let anyPinned = urls.contains(where: { PinnedFoldersService.shared.isPinned($0) })
+                if anyPinned {
+                    menu.addItem(blockItem("즐겨찾기에서 제거 (\(urls.count)개)") {
+                        for u in urls { PinnedFoldersService.shared.unpin(u) }
+                    })
+                } else if isPinnable {
+                    menu.addItem(blockItem("즐겨찾기에 추가 (\(urls.count)개)") {
+                        for u in urls { PinnedFoldersService.shared.pin(u) }
+                    })
+                }
+            } else {
+                if PinnedFoldersService.shared.isPinned(url) {
+                    menu.addItem(blockItem("즐겨찾기에서 제거") {
+                        PinnedFoldersService.shared.unpin(url)
+                    })
+                } else if isPinnable {
+                    menu.addItem(blockItem("즐겨찾기에 추가") {
+                        PinnedFoldersService.shared.pin(url)
+                    })
+                }
             }
             menu.addItem(.separator())
             menu.addItem(blockItem("새로 고침") { [weak self] in
-                self?.tree.reloadChildren(of: url)
+                guard let self = self else { return }
+                for u in urls { self.tree.reloadChildren(of: u) }
             })
-            menu.addItem(blockItem("Finder에서 보기") {
-                FileSystemService.shared.revealInFinder(url)
+            menu.addItem(blockItem(isMulti ? "Finder에서 보기 (\(urls.count)개)" : "Finder에서 보기") {
+                for u in urls { FileSystemService.shared.revealInFinder(u) }
             })
-            if Self.isEjectableVolume(url) {
+            if !isMulti, Self.isEjectableVolume(url) {
                 menu.addItem(.separator())
                 menu.addItem(blockItem("꺼내기") { [weak self] in
                     self?.eject(url)
                 })
             }
             menu.addItem(.separator())
-            menu.addItem(blockItem("경로 복사") {
+            menu.addItem(blockItem(isMulti ? "경로 복사 (\(urls.count)개)" : "경로 복사") {
                 let pb = NSPasteboard.general
                 pb.clearContents()
-                pb.setString(url.path, forType: .string)
+                pb.setString(urls.map { $0.path }.joined(separator: "\n"), forType: .string)
             })
         }
 

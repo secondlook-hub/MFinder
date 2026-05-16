@@ -155,6 +155,12 @@ final class NavigationState: ObservableObject {
     @Published var isLoading: Bool = false
     @Published private(set) var filteredItems: [FileItem] = []
     @Published var renamingURL: URL? = nil
+    /// URLs currently multi-selected in the sidebar tree. Published by the
+    /// SidebarOutlineView coordinator so notification-driven keyboard
+    /// shortcuts (Cmd+C / Cmd+X / ⌘⌫ when the sidebar has focus) can act on
+    /// the full selection. Empty when nothing is selected; falls back to
+    /// `[currentURL]` at the call site.
+    @Published var sidebarSelectionURLs: [URL] = []
     @Published private(set) var dataVersion: Int = 0
     /// True while a Spotlight query is in progress (used by status bar / address bar).
     @Published private(set) var isSearching: Bool = false
