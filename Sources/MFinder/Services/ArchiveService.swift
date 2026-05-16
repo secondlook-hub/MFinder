@@ -26,6 +26,17 @@ final class ArchiveService {
 
     // Detected at first use.
     private lazy var tools: [String: String] = detectTools()
+    /// Cached lookup for Bandizip.app — used as a graceful fallback when the
+    /// CLI archive tools (unrar / unar / 7z) aren't installed but Bandizip
+    /// is present. Bandizip is GUI-only on macOS, so we hand the archive
+    /// off via NSWorkspace and let the user click Extract there.
+    lazy var bandizipAppURL: URL? = {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.bandisoft.mac.bandizip") {
+            return url
+        }
+        let fallback = "/Applications/Bandizip.app"
+        return FileManager.default.fileExists(atPath: fallback) ? URL(fileURLWithPath: fallback) : nil
+    }()
 
     private func detectTools() -> [String: String] {
         let candidates: [(String, [String])] = [
@@ -51,6 +62,16 @@ final class ArchiveService {
 
     func has(_ tool: String) -> Bool { tools[tool] != nil }
     func path(_ tool: String) -> String? { tools[tool] }
+
+    /// Hands the archive off to Bandizip.app for the user to extract there.
+    /// Throws if Bandizip.app isn't installed.
+    func openWithBandizip(_ urls: [URL]) throws {
+        guard let app = bandizipAppURL else {
+            throw makeError("Bandizip.app이 설치되어 있지 않습니다.")
+        }
+        let config = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.open(urls, withApplicationAt: app, configuration: config, completionHandler: nil)
+    }
 
     // MARK: - Archive detection
 
@@ -155,14 +176,15 @@ final class ArchiveService {
     func canExtract(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
         let n = url.lastPathComponent.lowercased()
-        if ext == "zip" || ext == "jar" || ext == "war" || ext == "ear" { return has("unzip") || has("unar") }
+        let bandizipFallback = bandizipAppURL != nil
+        if ext == "zip" || ext == "jar" || ext == "war" || ext == "ear" { return has("unzip") || has("unar") || bandizipFallback }
         if ext == "tar" { return has("tar") }
         if n.hasSuffix(".tar.gz") || ext == "tgz" || ext == "gz" { return has("tar") }
         if n.hasSuffix(".tar.bz2") || ext == "tbz" || ext == "tbz2" || ext == "bz2" { return has("tar") }
         if n.hasSuffix(".tar.xz") || ext == "txz" || ext == "xz" { return has("tar") && has("xz") }
-        if ext == "7z" { return has("7z") || has("unar") }
-        if ext == "rar" { return has("unrar") || has("unar") }
-        return has("unar")  // last resort
+        if ext == "7z" { return has("7z") || has("unar") || bandizipFallback }
+        if ext == "rar" { return has("unrar") || has("unar") || bandizipFallback }
+        return has("unar") || bandizipFallback  // last resort
     }
 
     /// Extracts archive into its own directory next to the archive (folder named after archive basename).
@@ -218,25 +240,45 @@ final class ArchiveService {
             task.executableURL = URL(fileURLWithPath: bin)
             task.arguments = ["-xJf", archive.path, "-C", directory.path]
         } else if ext == "7z" {
-            guard let bin = path("7z") ?? path("unar") else { throw makeError("7z/unar 도구가 필요합니다 (brew install p7zip 또는 unar).") }
-            task.executableURL = URL(fileURLWithPath: bin)
-            if bin.hasSuffix("unar") {
-                task.arguments = ["-q", "-o", directory.path, archive.path]
+            if let bin = path("7z") ?? path("unar") {
+                task.executableURL = URL(fileURLWithPath: bin)
+                if bin.hasSuffix("unar") {
+                    task.arguments = ["-q", "-o", directory.path, archive.path]
+                } else {
+                    task.arguments = ["x", "-bd", "-y", "-o\(directory.path)", archive.path]
+                }
+            } else if bandizipAppURL != nil {
+                try openWithBandizip([archive])
+                return
             } else {
-                task.arguments = ["x", "-bd", "-y", "-o\(directory.path)", archive.path]
+                throw makeError("7z 압축을 풀려면 'brew install p7zip' 또는 'brew install unar', 또는 Bandizip.app이 필요합니다.")
             }
         } else if ext == "rar" {
-            guard let bin = path("unrar") ?? path("unar") else { throw makeError("unrar/unar 도구가 필요합니다 (brew install unar).") }
-            task.executableURL = URL(fileURLWithPath: bin)
-            if bin.hasSuffix("unar") {
-                task.arguments = ["-q", "-o", directory.path, archive.path]
+            if let bin = path("unrar") ?? path("unar") {
+                task.executableURL = URL(fileURLWithPath: bin)
+                if bin.hasSuffix("unar") {
+                    task.arguments = ["-q", "-o", directory.path, archive.path]
+                } else {
+                    task.arguments = ["x", "-y", archive.path, directory.path + "/"]
+                }
+            } else if bandizipAppURL != nil {
+                // RAR is proprietary — macOS ships no extractor by default.
+                // Hand off to Bandizip when no CLI is installed.
+                try openWithBandizip([archive])
+                return
             } else {
-                task.arguments = ["x", "-y", archive.path, directory.path + "/"]
+                throw makeError("RAR 압축을 풀려면 'brew install unar' (또는 unrar), 또는 Bandizip.app이 필요합니다.")
             }
         } else {
-            guard let bin = path("unar") else { throw makeError("이 형식은 지원되지 않습니다. 'brew install unar'를 설치해 보세요.") }
-            task.executableURL = URL(fileURLWithPath: bin)
-            task.arguments = ["-q", "-o", directory.path, archive.path]
+            if let bin = path("unar") {
+                task.executableURL = URL(fileURLWithPath: bin)
+                task.arguments = ["-q", "-o", directory.path, archive.path]
+            } else if bandizipAppURL != nil {
+                try openWithBandizip([archive])
+                return
+            } else {
+                throw makeError("이 형식은 지원되지 않습니다. 'brew install unar' 또는 Bandizip.app을 설치해 보세요.")
+            }
         }
 
         try runAndWait(task)

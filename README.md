@@ -18,7 +18,8 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Clipboard Stack** — Cut, copy, and paste multiple selections; a single ⌘V drains the entire stack into the current folder. Cut items are dimmed in both the file list and the sidebar tree
 - **Drag & Drop** — Drop file URLs from anywhere (Finder, other apps, this app's panes); hold Option to copy, default is move. Drop onto a tree folder to send items there
 - **Quick Look** — Spacebar previews the selection in the system Quick Look panel
-- **Archive (Bandizip)** — Right-click → Bandizip submenu to compress to .zip/.7z/.tar.gz/etc., or extract to here / to a subfolder / to a chosen location
+- **Archive (Bandizip)** — Right-click → Bandizip submenu to compress to .zip/.7z/.tar.gz/etc., or extract to here / to a subfolder / to a chosen location. RAR / 7z fall back to Bandizip.app when no CLI extractor (`unrar`, `unar`, `7z`) is installed
+- **Send to Bandizip** — "보내기 → Bandizip" hands selected files off to Bandizip.app when it's installed
 - **Send To** — 바탕 화면 (바로 가기), 다운로드, 문서, AirDrop, 메일, 메시지
 - **Trash / Delete** — ⌫ or ⌘⌫ moves to Trash via Finder (recoverable), ⌥⌘⌫ deletes immediately with confirmation, ⌘⇧⌫ empties the entire Trash
 - **Tab Bar** — Drag tabs to reorder; close-other-tabs from the context menu; tabs share the sidebar tree state

@@ -1036,6 +1036,12 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         sendMenu.addItem(block("문서 폴더") { [weak self] in
             self?.copyURLs(urls, to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents"))
         })
+        if ArchiveService.shared.bandizipAppURL != nil {
+            sendMenu.addItem(.separator())
+            sendMenu.addItem(block("Bandizip") {
+                try? ArchiveService.shared.openWithBandizip(urls)
+            })
+        }
         sendMenu.addItem(.separator())
         sendMenu.addItem(block("AirDrop") {
             NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls)
