@@ -73,7 +73,15 @@ private struct TabContent: View {
             AddressBar()
             CommandBar()
             HSplitView {
+                // Tag with the active tab's object identity so the entire
+                // sidebar (NSOutlineView + Coordinator + Combine
+                // subscriptions) is torn down and rebuilt against the new
+                // tab's NavigationState / FolderTreeStore on tab switch.
+                // Without this, the Coordinator keeps observing the
+                // previous tab's nav and the tree never moves to the new
+                // tab's currentURL.
                 SidebarView()
+                    .id(ObjectIdentifier(tab))
                     .frame(minWidth: 160, idealWidth: 240, maxWidth: 400)
                 FileListView()
                     .frame(minWidth: 400)
