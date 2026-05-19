@@ -863,6 +863,95 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 pb.clearContents()
                 pb.setString(urls.map { $0.path }.joined(separator: "\n"), forType: .string)
             })
+            // 속성 is single-target — always operates on the clicked row even
+            // when a multi-selection is active, to match macOS Get Info ergonomics.
+            menu.addItem(.separator())
+            menu.addItem(blockItem("속성") { [weak self] in
+                self?.showProperties(for: url)
+            })
+        }
+
+        // MARK: - Properties dialog
+
+        private func showProperties(for url: URL) {
+            let alert = NSAlert()
+            alert.messageText = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+            alert.icon = NSWorkspace.shared.icon(forFile: url.path)
+
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            var creationStr = "-"
+            var modStr = "-"
+            if let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
+                if let c = vals.creationDate { creationStr = f.string(from: c) }
+                if let m = vals.contentModificationDate { modStr = f.string(from: m) }
+            }
+
+            func keyField(_ s: String) -> NSTextField {
+                let tf = NSTextField(labelWithString: s)
+                tf.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+                tf.textColor = .secondaryLabelColor
+                return tf
+            }
+            func valueField(_ s: String) -> NSTextField {
+                let tf = NSTextField(labelWithString: s)
+                tf.font = NSFont.systemFont(ofSize: 12)
+                tf.isSelectable = true
+                return tf
+            }
+
+            let sizeValue = valueField("계산 중…")
+            let grid = NSGridView(views: [
+                [keyField("만든 날짜:"),  valueField(creationStr)],
+                [keyField("수정한 날짜:"), valueField(modStr)],
+                [keyField("크기:"),       sizeValue]
+            ])
+            grid.translatesAutoresizingMaskIntoConstraints = false
+            grid.rowSpacing = 6
+            grid.columnSpacing = 10
+            grid.column(at: 0).xPlacement = .trailing
+
+            let fit = grid.fittingSize
+            grid.frame = NSRect(origin: .zero,
+                                size: NSSize(width: max(fit.width, 320), height: fit.height))
+            alert.accessoryView = grid
+            alert.addButton(withTitle: "확인")
+
+            // Folder sizes can be expensive; compute off the main thread and
+            // patch the label when the value lands. NSAlert's modal run loop
+            // keeps processing main-queue dispatches, so the live update works.
+            DispatchQueue.global(qos: .userInitiated).async { [weak sizeValue] in
+                let bytes = SidebarOutlineRepresentable.Coordinator.totalSize(at: url)
+                let str = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+                DispatchQueue.main.async {
+                    sizeValue?.stringValue = str
+                }
+            }
+
+            alert.runModal()
+        }
+
+        nonisolated private static func totalSize(at url: URL) -> Int64 {
+            let fm = FileManager.default
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            if !isDir {
+                let v = try? url.resourceValues(forKeys: [.fileSizeKey])
+                return Int64(v?.fileSize ?? 0)
+            }
+            guard let en = fm.enumerator(
+                at: url,
+                includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+                options: [.skipsPackageDescendants],
+                errorHandler: nil
+            ) else { return 0 }
+            var total: Int64 = 0
+            for case let fileURL as URL in en {
+                guard let vals = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                      vals.isRegularFile == true,
+                      let size = vals.fileSize else { continue }
+                total += Int64(size)
+            }
+            return total
         }
 
         /// True if `url` is a mounted volume that can be unmounted/ejected —

@@ -27,7 +27,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Pinned Favorites** — Add any folder to the 즐겨찾기 sidebar section via the right-click menu in either the sidebar tree or the file list ("즐겨찾기에 추가" / "즐겨찾기에서 제거")
 - **Permission Guidance** — TCC-protected folders (OneDrive / Google Drive / Dropbox under `~/Library/CloudStorage`) trigger a clear dialog with a one-click jump to System Settings → Privacy & Security → Full Disk Access
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
-- **File Properties** — 속성 dialog with size, type, dates, and permissions
+- **File Properties** — 속성 dialog on file-list items (size, type, dates, permissions) and on sidebar tree folders (만든/수정 날짜 + async-computed total size)
 - **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
 - **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs, sidebar tree, and clipboard stack. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
 - **Korean UI** — Native Korean menu labels throughout

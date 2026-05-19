@@ -161,3 +161,4 @@ Wrap the body in `MainActor.assumeIsolated { ... }`. Used by the Dock menu actio
 - v1.7 — RAR/7z fallback to Bandizip.app when no CLI installed + "보내기 → Bandizip" entry.
 - v1.8 — Multi-select in the sidebar tree (Cmd-/Shift-click), multi-aware context menu + bulk trash dialog.
 - v1.9 — Sidebar tree follows the active tab on switch (.id(ObjectIdentifier(tab))).
+- v1.10 — Sidebar tree right-click → 속성 dialog (만든/수정 날짜 + async folder size via background enumerator).
