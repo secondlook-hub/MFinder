@@ -13,12 +13,23 @@ enum SidebarItem: Hashable {
     case favoriteRoot(QuickAccessItem)
     case pcRoot(QuickAccessItem)
     case folder(URL)
+    /// A remote server entry under the 네트워크 section. The URL is the
+    /// server address (e.g. `smb://server/share`), not a local mount point.
+    case server(URL)
+    /// "서버에 연결…" action row at the bottom of the 네트워크 section.
+    case connectAction
 
+    /// Local filesystem URL the row represents, when it has one. Server and
+    /// action rows return nil here — callers that care about a server's
+    /// mount point should resolve it explicitly via
+    /// `NetworkConnectService.mountPoint(for:)` (which requires the main
+    /// actor), so the rest of the sidebar treats unmounted (or
+    /// to-be-mounted) servers as "no folder to act on".
     var folderURL: URL? {
         switch self {
         case .favoriteRoot(let qa), .pcRoot(let qa): return qa.url
         case .folder(let url): return url
-        case .section: return nil
+        case .section, .server, .connectAction: return nil
         }
     }
 
@@ -112,9 +123,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         scrollView.documentView = outline
 
         outline.reloadData()
-        // Sections always start expanded except Network (rarely used and empty).
+        // All three sections start expanded — Network now carries at least
+        // the "서버에 연결…" action row so it's worth showing on launch.
         outline.expandItem(SidebarItem.section(.favorites))
         outline.expandItem(SidebarItem.section(.thisPC))
+        outline.expandItem(SidebarItem.section(.network))
 
         context.coordinator.installObservers()
         context.coordinator.applyState()
@@ -189,7 +202,20 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 case .thisPC:
                     return FileSystemService.shared.thisPCLocations().map { .pcRoot($0) }
                 case .network:
-                    return []
+                    // Recent servers from history + any currently-mounted
+                    // remote volume that isn't already in the recents list
+                    // (e.g. mounted before MFinder learned about it).
+                    let recents = NetworkConnectService.shared.recentServers
+                    var rows: [SidebarItem] = recents.map { .server($0) }
+                    let seen = Set(recents.map { $0.absoluteString })
+                    for mount in NetworkConnectService.shared.mountedRemoteVolumes() {
+                        if let remount = try? mount.resourceValues(forKeys: [.volumeURLForRemountingKey]).volumeURLForRemounting,
+                           !seen.contains(remount.absoluteString) {
+                            rows.append(.server(remount))
+                        }
+                    }
+                    rows.append(.connectAction)
+                    return rows
                 }
             case .favoriteRoot(let qa), .pcRoot(let qa):
                 let kids = tree.children(of: qa.url) ?? []
@@ -197,6 +223,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             case .folder(let url):
                 let kids = tree.children(of: url) ?? []
                 return kids.map { .folder($0) }
+            case .server, .connectAction:
+                return []
             }
         }
 
@@ -215,8 +243,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
             guard let node = item as? SidebarItem else { return false }
             switch node {
-            case .section(let s):
-                return s != .network
+            case .section:
+                // The 네트워크 section is always expandable now — it carries
+                // at least the "서버에 연결…" action row.
+                return true
             case .favoriteRoot, .pcRoot:
                 return true   // optimistic; chevron disappears on actual empty load
             case .folder(let url):
@@ -224,6 +254,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     return !cached.isEmpty
                 }
                 return true
+            case .server, .connectAction:
+                return false
             }
         }
 
@@ -240,6 +272,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return makeQuickAccessCell(qa: qa, isPinned: false)
             case .folder(let url):
                 return makeFolderCell(url: url)
+            case .server(let server):
+                return makeServerCell(server: server)
+            case .connectAction:
+                return makeConnectActionCell()
             }
         }
 
@@ -297,6 +333,18 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     nav.navigate(to: url)
                 }
                 tree.expand(url)
+            case .server(let server):
+                // Only navigate when already mounted; an unmounted server row
+                // sits selected silently and waits for an explicit 연결 from
+                // the menu or a double-click.
+                if let mountPoint = NetworkConnectService.shared.mountPoint(for: server),
+                   nav.currentURL.standardizedFileURL.path != mountPoint.standardizedFileURL.path {
+                    nav.navigate(to: mountPoint)
+                }
+            case .connectAction:
+                NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                // Don't leave the action row highlighted.
+                ov.deselectAll(nil)
             case .section:
                 break
             }
@@ -356,6 +404,72 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                                color: NSColor(red: 0.96, green: 0.78, blue: 0.18, alpha: 1.0),
                                name: url.lastPathComponent,
                                url: url)
+        }
+
+        private func makeServerCell(server: URL) -> NSView {
+            let mounted = NetworkConnectService.shared.mountPoint(for: server) != nil
+            let cell = NSTableCellView()
+            let icon = NSImageView()
+            icon.image = NSImage(systemSymbolName: mounted ? "externaldrive.connected.to.line.below.fill" : "server.rack",
+                                 accessibilityDescription: nil)
+            icon.contentTintColor = mounted ? .systemGreen : .secondaryLabelColor
+            icon.translatesAutoresizingMaskIntoConstraints = false
+            let label = NSTextField(labelWithString: serverDisplayName(server))
+            label.font = .systemFont(ofSize: 12)
+            label.textColor = .black
+            label.lineBreakMode = .byTruncatingTail
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.toolTip = server.absoluteString
+            cell.addSubview(icon)
+            cell.addSubview(label)
+            cell.imageView = icon
+            cell.textField = label
+            NSLayoutConstraint.activate([
+                icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                icon.widthAnchor.constraint(equalToConstant: 16),
+                icon.heightAnchor.constraint(equalToConstant: 14),
+                label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+            return cell
+        }
+
+        private func makeConnectActionCell() -> NSView {
+            let cell = NSTableCellView()
+            let icon = NSImageView()
+            icon.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
+            icon.contentTintColor = .systemBlue
+            icon.translatesAutoresizingMaskIntoConstraints = false
+            let label = NSTextField(labelWithString: "서버에 연결…")
+            label.font = .systemFont(ofSize: 12)
+            label.textColor = .systemBlue
+            label.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(icon)
+            cell.addSubview(label)
+            cell.imageView = icon
+            cell.textField = label
+            NSLayoutConstraint.activate([
+                icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                icon.widthAnchor.constraint(equalToConstant: 16),
+                icon.heightAnchor.constraint(equalToConstant: 14),
+                label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+            return cell
+        }
+
+        /// "server/share" extracted from "smb://server/share" — falls back to
+        /// the full absolute string when there's no obvious last path component.
+        private func serverDisplayName(_ server: URL) -> String {
+            let host = server.host ?? ""
+            let path = server.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if host.isEmpty { return server.absoluteString }
+            if path.isEmpty { return host }
+            return "\(host)/\(path)"
         }
 
         private func buildIconLabelCell(symbol: String, color: NSColor, name: String, url: URL) -> NSTableCellView {
@@ -431,6 +545,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.applyState() }
                 .store(in: &cancellables)
+            NetworkConnectService.shared.$recentServers
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.reloadNetworkSection() }
+                .store(in: &cancellables)
 
             // Mount / unmount notifications arrive on NSWorkspace's own
             // notification center, not the default one. Reload just the
@@ -443,6 +561,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 queue: .main
             ) { [weak self] _ in
                 self?.reloadThisPCSection()
+                self?.reloadNetworkSection()
             }
             volumeUnmountToken = ws.addObserver(
                 forName: NSWorkspace.didUnmountNotification,
@@ -450,6 +569,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 queue: .main
             ) { [weak self] _ in
                 self?.reloadThisPCSection()
+                self?.reloadNetworkSection()
             }
         }
 
@@ -742,25 +862,110 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             menu.removeAllItems()
             guard let ov = outlineView else { return }
             let row = ov.clickedRow
-            guard row >= 0, let node = ov.item(atRow: row) as? SidebarItem else { return }
+            // Right-click on empty sidebar space — offer just the connect
+            // action so the feature is reachable from anywhere in the tree.
+            if row < 0 {
+                menu.addItem(blockItem("서버에 연결…") {
+                    NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                })
+                return
+            }
+            guard let node = ov.item(atRow: row) as? SidebarItem else { return }
             switch node {
             case .section(let s):
+                if s == .network {
+                    menu.addItem(blockItem("서버에 연결…") {
+                        NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                    })
+                    if !NetworkConnectService.shared.recentServers.isEmpty {
+                        menu.addItem(.separator())
+                        menu.addItem(blockItem("최근 사용한 서버 지우기") { [weak self] in
+                            NetworkConnectService.shared.clearRecent()
+                            self?.reloadNetworkSection()
+                        })
+                    }
+                    menu.addItem(.separator())
+                }
                 let title = ov.isItemExpanded(node) ? "접기" : "확장"
-                menu.addItem(blockItem(title) { [weak ov, weak self] in
-                    guard let ov = ov, let self = self else { return }
+                menu.addItem(blockItem(title) { [weak ov] in
+                    guard let ov = ov else { return }
                     if ov.isItemExpanded(node) {
                         ov.collapseItem(node)
                     } else {
                         ov.expandItem(node)
                     }
-                    _ = s
-                    _ = self
                 })
             case .favoriteRoot(let qa), .pcRoot(let qa):
                 buildItemMenu(menu, url: qa.url, isFolder: true, isPinnable: true)
             case .folder(let url):
                 buildItemMenu(menu, url: url, isFolder: true, isPinnable: true)
+            case .server(let server):
+                buildServerMenu(menu, server: server)
+            case .connectAction:
+                menu.addItem(blockItem("서버에 연결…") {
+                    NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                })
             }
+        }
+
+        private func buildServerMenu(_ menu: NSMenu, server: URL) {
+            let mountPoint = NetworkConnectService.shared.mountPoint(for: server)
+            let mounted = mountPoint != nil
+            if mounted, let mp = mountPoint {
+                menu.addItem(blockItem("열기") { [weak self] in
+                    self?.nav.navigate(to: mp)
+                })
+                menu.addItem(blockItem("새 탭에서 열기") {
+                    NotificationCenter.default.post(name: .mfinderNewTab, object: mp)
+                })
+                menu.addItem(.separator())
+                menu.addItem(blockItem("연결 끊기") { [weak self] in
+                    NetworkConnectService.shared.disconnect(mp) { err in
+                        if let err = err {
+                            showTreeAlert("연결 끊기 실패", err.localizedDescription)
+                        }
+                        self?.reloadNetworkSection()
+                    }
+                })
+            } else {
+                menu.addItem(blockItem("연결") { [weak self] in
+                    self?.connectFromSidebar(server)
+                })
+            }
+            menu.addItem(.separator())
+            menu.addItem(blockItem("주소 복사") {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(server.absoluteString, forType: .string)
+            })
+            menu.addItem(blockItem("목록에서 제거") { [weak self] in
+                NetworkConnectService.shared.removeRecent(server)
+                self?.reloadNetworkSection()
+            })
+        }
+
+        /// Initiate a connect from the sidebar without going through the
+        /// dialog — silently mounts, navigates the active tab on success, and
+        /// shows an alert on failure.
+        private func connectFromSidebar(_ server: URL) {
+            NetworkConnectService.shared.connect(to: server) { [weak self] result in
+                switch result {
+                case .success(let mounted):
+                    if let first = mounted.first {
+                        self?.nav.navigate(to: first)
+                    }
+                    self?.reloadNetworkSection()
+                case .failure(let err):
+                    showTreeAlert("서버 연결 실패", err.localizedDescription)
+                }
+            }
+        }
+
+        fileprivate func reloadNetworkSection() {
+            guard let ov = outlineView else { return }
+            let item = SidebarItem.section(.network)
+            ov.reloadItem(item, reloadChildren: true)
+            ov.expandItem(item)
         }
 
         private func buildItemMenu(_ menu: NSMenu, url: URL, isFolder: Bool, isPinnable: Bool) {

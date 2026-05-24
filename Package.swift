@@ -9,7 +9,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MFinder",
-            path: "Sources/MFinder"
+            path: "Sources/MFinder",
+            linkerSettings: [
+                .linkedFramework("NetFS")
+            ]
         )
     ]
 )

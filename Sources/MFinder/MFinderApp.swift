@@ -47,6 +47,10 @@ struct MFinderApp: App {
                 Button("위로") {
                     NotificationCenter.default.post(name: .mfinderGoUp, object: nil)
                 }.keyboardShortcut(.upArrow, modifiers: [.command])
+                Divider()
+                Button("서버에 연결…") {
+                    NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                }.keyboardShortcut("k", modifiers: .command)
             }
             CommandGroup(replacing: .help) {
                 Button("업데이트 확인…") {
@@ -73,6 +77,7 @@ extension Notification.Name {
     static let mfinderTreeCopy          = Notification.Name("mfinder.treeCopy")
     static let mfinderTreeCut           = Notification.Name("mfinder.treeCut")
     static let mfinderTreePaste         = Notification.Name("mfinder.treePaste")
+    static let mfinderConnectToServer   = Notification.Name("mfinder.connectToServer")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

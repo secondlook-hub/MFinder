@@ -37,6 +37,11 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .mfinderPrevTab)) { _ in
             tabs.prevTab()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderConnectToServer)) { _ in
+            ServerConnectDialog.shared.present { mountedURL in
+                tabs.newTab(at: mountedURL)
+            }
+        }
         .task {
             // Auto-check GitHub Releases on launch. Silent on failure.
             await updateChecker.checkForUpdates()

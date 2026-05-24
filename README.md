@@ -30,6 +30,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **File Properties** — 속성 dialog on file-list items (size, type, dates, permissions) and on sidebar tree folders (만든/수정 날짜 + async-computed total size)
 - **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
 - **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs and sidebar tree. The clipboard stack is unified across all running instances. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
+- **Connect to Server** — 이동 → "서버에 연결…" (⌘K) or right-click on the 네트워크 sidebar section opens a Finder-style dialog for `smb://`, `afp://`, `ftp://`, `nfs://`, and WebDAV URLs. Mounts via `NetFS.framework` so the system's credentials sheet and Keychain are reused. Recent servers are persisted and listed under the 네트워크 section — right-click → 연결 / 연결 끊기 / 목록에서 제거
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install
@@ -64,6 +65,7 @@ Requires **Swift 5.9** and **macOS 13.0 Ventura** or later.
 | Cmd+C | Copy selection |
 | Cmd+X | Cut selection |
 | Cmd+V | Paste from clipboard stack |
+| Cmd+K | Connect to Server |
 | ⌫ / Cmd+⌫ | Move selection to Trash |
 | Option+Cmd+⌫ | Delete immediately (with confirmation) |
 | Shift+Cmd+⌫ | Empty Trash |
