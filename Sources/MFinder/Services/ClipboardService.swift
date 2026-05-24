@@ -14,18 +14,23 @@ struct ClipboardEntry: Hashable, Identifiable {
 /// Clipboard with stacking semantics: ⌘C / ⌘X accumulate into a stack instead
 /// of replacing. A single ⌘V drains the stack, performing copy or move per
 /// entry as appropriate. Same URL re-added flips its mode (most recent wins).
+///
+/// The system pasteboard is the single source of truth — the published `stack`
+/// is a cache that's refreshed whenever this process becomes active. This
+/// means two MFinder instances share one unified stack: copying multi-files
+/// in instance A makes them paste-able (still as a stack with cut/copy flags)
+/// in instance B, and draining via paste in either instance empties both.
 final class ClipboardService: ObservableObject, @unchecked Sendable {
     static let shared = ClipboardService()
 
+    /// Custom pasteboard type carrying the full ordered stack (URL + isCut
+    /// per entry) as JSON. Sits alongside the standard `.fileURL` items so
+    /// external apps (Finder, etc.) still see the file URLs.
+    private static let stackType = NSPasteboard.PasteboardType("com.secondlook.MFinder.clipboard-stack")
+
     @Published private(set) var stack: [ClipboardEntry] = []
 
-    /// Bumped whenever the app comes to the foreground. Serves as a SwiftUI
-    /// dependency hook for `hasContent` so that views update when another
-    /// MFinder process (or any other app) puts URLs onto the system
-    /// pasteboard — without this, a freshly launched second instance's
-    /// "붙여넣기" button stays disabled because its own `stack` is empty.
-    @Published private(set) var pasteboardSnapshot: Int = 0
-
+    private var lastSyncedChangeCount: Int = -1
     private var becomeActiveToken: NSObjectProtocol?
 
     private init() {
@@ -34,8 +39,9 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.pasteboardSnapshot &+= 1
+            self?.refreshFromPasteboardIfChanged()
         }
+        refreshFromPasteboardIfChanged()
     }
 
     deinit {
@@ -44,20 +50,9 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         }
     }
 
-    /// True if there's something to paste — either our local stack has items
-    /// or the system pasteboard carries file URLs (from another instance or
-    /// any external app). Reading the pasteboard here lets cross-instance
-    /// copy/paste work: instance A copies, instance B reads what A wrote.
-    var hasContent: Bool {
-        if !stack.isEmpty { return true }
-        return systemPasteboardHasFileURLs
-    }
+    // MARK: - Derived
 
-    private var systemPasteboardHasFileURLs: Bool {
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: opts) as? [URL]
-        return !(urls?.isEmpty ?? true)
-    }
+    var hasContent: Bool { !stack.isEmpty }
 
     /// Convenience: URLs currently in the stack, preserving insertion order.
     var pending: [URL] { stack.map(\.url) }
@@ -73,11 +68,9 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
     /// Nil if the stack is empty or mixed.
     var dominantMode: Bool? {
         guard !stack.isEmpty else { return nil }
-        let allCut  = stack.allSatisfy(\.isCut)
-        let allCopy = stack.allSatisfy { !$0.isCut }
-        if allCut  { return true }
-        if allCopy { return false }
-        return nil  // mixed
+        if stack.allSatisfy(\.isCut) { return true }
+        if stack.allSatisfy({ !$0.isCut }) { return false }
+        return nil
     }
 
     // MARK: - Stack mutation
@@ -92,24 +85,26 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
 
     private func add(_ urls: [URL], asCut: Bool) {
         guard !urls.isEmpty else { return }
-        // Replace existing entries that match the incoming URLs, then append.
-        // Order is preserved for existing-not-rewritten items; new/updated
-        // items go to the end so the most recent action is most "fresh".
+        refreshFromPasteboardIfChanged()
+        var next = stack
         let incoming = Set(urls.map { $0.standardizedFileURL })
-        stack.removeAll { incoming.contains($0.url.standardizedFileURL) }
+        next.removeAll { incoming.contains($0.url.standardizedFileURL) }
         for url in urls {
-            stack.append(ClipboardEntry(url: url.standardizedFileURL, isCut: asCut))
+            next.append(ClipboardEntry(url: url.standardizedFileURL, isCut: asCut))
         }
-        writePasteboard(urls)
+        commit(next)
     }
 
     func remove(_ url: URL) {
+        refreshFromPasteboardIfChanged()
         let std = url.standardizedFileURL
-        stack.removeAll { $0.url.standardizedFileURL == std }
+        var next = stack
+        next.removeAll { $0.url.standardizedFileURL == std }
+        commit(next)
     }
 
     func clear() {
-        stack = []
+        commit([])
     }
 
     // MARK: - Paste
@@ -117,17 +112,12 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
     /// Drains the stack into `destination`. Each entry is moved (cut) or
     /// copied based on its `isCut` flag. Returns the URLs that were
     /// successfully created at the destination. Always clears the stack
-    /// after attempting all items (so users don't end up double-pasting).
+    /// (in both this process and the system pasteboard, so all instances
+    /// agree) after attempting all items so users don't double-paste.
     @discardableResult
     func paste(into destination: URL) throws -> [URL] {
-        // If the stack is empty, fall back to the system pasteboard as plain copy.
-        let entries: [ClipboardEntry]
-        if !stack.isEmpty {
-            entries = stack
-        } else {
-            let pbURLs = readPasteboardURLs()
-            entries = pbURLs.map { ClipboardEntry(url: $0, isCut: false) }
-        }
+        refreshFromPasteboardIfChanged()
+        let entries = stack
         guard !entries.isEmpty else {
             throw NSError(domain: "MFinder.Clipboard", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "클립보드가 비어 있습니다."])
@@ -149,12 +139,76 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                 if firstError == nil { firstError = error }
             }
         }
-        // Drain the stack whether or not every item succeeded — partial
-        // success is still progress and we don't want the user to accidentally
-        // re-paste the surviving entries with another ⌘V.
-        stack = []
+        commit([])
         if created.isEmpty, let err = firstError { throw err }
         return created
+    }
+
+    // MARK: - Pasteboard ↔ stack sync
+
+    private func commit(_ entries: [ClipboardEntry]) {
+        writePasteboard(entries)
+        lastSyncedChangeCount = NSPasteboard.general.changeCount
+        stack = entries
+    }
+
+    /// Re-read the system pasteboard if another process (or app) modified it.
+    /// Cheap to call — early-returns when the pasteboard hasn't changed.
+    private func refreshFromPasteboardIfChanged() {
+        let cc = NSPasteboard.general.changeCount
+        if cc == lastSyncedChangeCount { return }
+        lastSyncedChangeCount = cc
+        let entries = readStackFromPasteboard()
+        if entries != stack { stack = entries }
+    }
+
+    private func writePasteboard(_ entries: [ClipboardEntry]) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        guard !entries.isEmpty else { return }
+
+        let metaData = try? JSONEncoder().encode(entries.map(EntryPayload.init))
+        var items: [NSPasteboardItem] = []
+        for (idx, entry) in entries.enumerated() {
+            let item = NSPasteboardItem()
+            item.setString(entry.url.absoluteString, forType: .fileURL)
+            // Carry the full stack metadata on the first item so a single
+            // `pb.data(forType: stackType)` reads it back without iterating.
+            if idx == 0, let data = metaData {
+                item.setData(data, forType: Self.stackType)
+            }
+            items.append(item)
+        }
+        pb.writeObjects(items)
+    }
+
+    private func readStackFromPasteboard() -> [ClipboardEntry] {
+        let pb = NSPasteboard.general
+        if let data = pb.data(forType: Self.stackType),
+           let payload = try? JSONDecoder().decode([EntryPayload].self, from: data) {
+            let entries = payload.compactMap { $0.toEntry() }
+            if !entries.isEmpty { return entries }
+        }
+        // Fallback: some other app (or older MFinder) put plain file URLs on
+        // the pasteboard. Treat them as copy entries.
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty {
+            return urls.map { ClipboardEntry(url: $0.standardizedFileURL, isCut: false) }
+        }
+        return []
+    }
+
+    private struct EntryPayload: Codable {
+        let url: String
+        let isCut: Bool
+        init(_ entry: ClipboardEntry) {
+            self.url = entry.url.absoluteString
+            self.isCut = entry.isCut
+        }
+        func toEntry() -> ClipboardEntry? {
+            guard let u = URL(string: url) else { return nil }
+            return ClipboardEntry(url: u.standardizedFileURL, isCut: isCut)
+        }
     }
 
     // MARK: - Helpers
@@ -174,17 +228,5 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
             i += 1
         } while fm.fileExists(atPath: candidate.path)
         return candidate
-    }
-
-    private func writePasteboard(_ urls: [URL]) {
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.writeObjects(urls.map { $0 as NSURL })
-    }
-
-    private func readPasteboardURLs() -> [URL] {
-        let pb = NSPasteboard.general
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        return (pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL]) ?? []
     }
 }

@@ -334,6 +334,17 @@ struct FileListView: View {
             }
         }
 
+        Menu("새로 만들기") {
+            Button("폴더") { createNewFolder() }
+            Divider()
+            Button("텍스트 문서") { createNewFile(name: "새 텍스트 문서.txt") }
+            Button("Markdown 문서") { createNewFile(name: "새 문서.md") }
+            Button("리치 텍스트 문서") { createNewFile(name: "새 문서.rtf") }
+            Button("Shell 스크립트") { createNewFile(name: "새 스크립트.sh") }
+            Button("HTML 문서") { createNewFile(name: "새 문서.html") }
+            Button("JSON 파일") { createNewFile(name: "새 데이터.json") }
+        }
+
         Divider()
 
         // ── Rename / Delete

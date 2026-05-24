@@ -162,3 +162,4 @@ Wrap the body in `MainActor.assumeIsolated { ... }`. Used by the Dock menu actio
 - v1.8 — Multi-select in the sidebar tree (Cmd-/Shift-click), multi-aware context menu + bulk trash dialog.
 - v1.9 — Sidebar tree follows the active tab on switch (.id(ObjectIdentifier(tab))).
 - v1.10 — Sidebar tree right-click → 속성 dialog (만든/수정 날짜 + async folder size via background enumerator).
+- v1.11 — Cross-instance unified clipboard stack (system pasteboard is source of truth, encoded with custom `com.secondlook.MFinder.clipboard-stack` type carrying cut/copy flags and ordering) + 새로 만들기 submenu added to file-table per-file menu, file-list per-item menu, and sidebar folder right-click menu.

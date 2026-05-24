@@ -149,6 +149,68 @@ func showTreeAlert(_ title: String, _ message: String) {
     alert.runModal()
 }
 
+// MARK: - "새로 만들기" (shared between sidebar, file table, and file list)
+
+/// Returns a non-colliding child URL by appending " (2)", " (3)", … if needed,
+/// preserving the extension.
+@MainActor
+func uniqueChildURL(_ name: String, in dir: URL) -> URL {
+    let fm = FileManager.default
+    var candidate = dir.appendingPathComponent(name)
+    guard fm.fileExists(atPath: candidate.path) else { return candidate }
+    let probe = URL(fileURLWithPath: name)
+    let base = probe.deletingPathExtension().lastPathComponent
+    let ext = probe.pathExtension
+    var i = 2
+    repeat {
+        let newName = ext.isEmpty ? "\(base) (\(i))" : "\(base) (\(i)).\(ext)"
+        candidate = dir.appendingPathComponent(newName)
+        i += 1
+    } while fm.fileExists(atPath: candidate.path)
+    return candidate
+}
+
+/// Standard menu items the "새로 만들기" submenu offers everywhere. Each entry
+/// is (label, filename) — `nil` filename means "create a folder named 새 폴더".
+let newItemTemplates: [(label: String, filename: String?)] = [
+    ("폴더",            nil),
+    ("텍스트 문서",      "새 텍스트 문서.txt"),
+    ("Markdown 문서",    "새 문서.md"),
+    ("리치 텍스트 문서",  "새 문서.rtf"),
+    ("Shell 스크립트",   "새 스크립트.sh"),
+    ("HTML 문서",        "새 문서.html"),
+    ("JSON 파일",        "새 데이터.json"),
+]
+
+@MainActor
+func createNewFolderShared(in dst: URL, nav: NavigationState, tree: FolderTreeStore) {
+    let url = uniqueChildURL("새 폴더", in: dst)
+    do {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        afterCreating(url, parent: dst, nav: nav, tree: tree)
+    } catch {
+        showTreeAlert("폴더 만들기 실패", error.localizedDescription)
+    }
+}
+
+@MainActor
+func createNewFileShared(name: String, in dst: URL, nav: NavigationState, tree: FolderTreeStore) {
+    let url = uniqueChildURL(name, in: dst)
+    guard FileManager.default.createFile(atPath: url.path, contents: Data()) else {
+        showTreeAlert("파일 만들기 실패", "\(url.path) 에 파일을 만들 수 없습니다.")
+        return
+    }
+    afterCreating(url, parent: dst, nav: nav, tree: tree)
+}
+
+@MainActor
+private func afterCreating(_ url: URL, parent: URL, nav: NavigationState, tree: FolderTreeStore) {
+    tree.reloadChildren(of: parent)
+    if parent.standardizedFileURL == nav.currentURL.standardizedFileURL {
+        nav.reload(thenSelect: [url])
+    }
+}
+
 @MainActor
 func pasteIntoFolderShared(_ dst: URL, nav: NavigationState, tree: FolderTreeStore) {
     do {

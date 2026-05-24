@@ -804,6 +804,28 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 guard let self = self else { return }
                 for u in urls { self.createAliasInParent(of: u) }
             })
+            // 새로 만들기 (creates inside the clicked folder). Single-target by
+            // design — picking a destination from a multi-selection would be
+            // ambiguous.
+            if !isMulti {
+                let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
+                let newMenu = NSMenu()
+                for (idx, tpl) in newItemTemplates.enumerated() {
+                    if idx == 1 { newMenu.addItem(.separator()) }
+                    let label = tpl.label
+                    let filename = tpl.filename
+                    newMenu.addItem(blockItem(label) { [weak self] in
+                        guard let self = self else { return }
+                        if let filename = filename {
+                            createNewFileShared(name: filename, in: url, nav: self.nav, tree: self.tree)
+                        } else {
+                            createNewFolderShared(in: url, nav: self.nav, tree: self.tree)
+                        }
+                    })
+                }
+                newItem.submenu = newMenu
+                menu.addItem(newItem)
+            }
             menu.addItem(.separator())
             // Rename is one folder at a time.
             if !isMulti {

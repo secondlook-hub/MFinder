@@ -16,7 +16,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Address Bar** — Breadcrumb path navigation, editable URL field, jump to any ancestor
 - **Spotlight Search** — Backed by NSMetadataQuery with token parsing: `-exclude` words, `"quoted phrases"`, content + filename matching. Inline snippet preview in the file list
 - **Live File-System Watcher** — `kqueue`-based vnode watcher reliably refreshes the file list and tree branches as the contents change on disk (including from Finder or shell)
-- **Clipboard Stack** — Cut, copy, and paste multiple selections; a single ⌘V drains the entire stack into the current folder. Cut items are dimmed in both the file list and the sidebar tree
+- **Clipboard Stack** — Cut, copy, and paste multiple selections; a single ⌘V drains the entire stack into the current folder. Cut items are dimmed in both the file list and the sidebar tree. The stack is shared across every running MFinder instance via the system pasteboard, so a multi-file copy in one window is fully paste-able in any other
 - **Drag & Drop** — Drop file URLs from anywhere (Finder, other apps, this app's panes); hold Option to copy, default is move. Drop onto a tree folder to send items there
 - **Quick Look** — Spacebar previews the selection in the system Quick Look panel
 - **Archive (Bandizip)** — Right-click → Bandizip submenu to compress to .zip/.7z/.tar.gz/etc., or extract to here / to a subfolder / to a chosen location. RAR / 7z fall back to Bandizip.app when no CLI extractor (`unrar`, `unar`, `7z`) is installed
@@ -29,7 +29,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
 - **File Properties** — 속성 dialog on file-list items (size, type, dates, permissions) and on sidebar tree folders (만든/수정 날짜 + async-computed total size)
 - **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
-- **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs, sidebar tree, and clipboard stack. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
+- **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs and sidebar tree. The clipboard stack is unified across all running instances. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install

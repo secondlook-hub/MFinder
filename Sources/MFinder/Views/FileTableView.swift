@@ -1003,6 +1003,20 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         copyAdv.submenu = copyMenu
         menu.addItem(copyAdv)
 
+        // 새로 만들기 (creates inside the current folder, matching the empty-area menu).
+        let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
+        let newMenu = NSMenu()
+        for (idx, tpl) in newItemTemplates.enumerated() {
+            if idx == 1 { newMenu.addItem(.separator()) }
+            if let filename = tpl.filename {
+                newMenu.addItem(block(tpl.label) { [weak self] in self?.createNewFile(name: filename) })
+            } else {
+                newMenu.addItem(block(tpl.label) { [weak self] in self?.createNewFolder() })
+            }
+        }
+        newItem.submenu = newMenu
+        menu.addItem(newItem)
+
         menu.addItem(.separator())
 
         menu.addItem(block("이름 바꾸기") { [weak self] in
@@ -1178,15 +1192,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         // 새로 만들기
         let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
         let newMenu = NSMenu()
-        newMenu.addItem(block("폴더") { [weak self] in
-            self?.createNewFolder()
-        })
-        newMenu.addItem(.separator())
-        newMenu.addItem(block("텍스트 문서") { [weak self] in self?.createNewFile(name: "새 텍스트 문서.txt") })
-        newMenu.addItem(block("Markdown 문서") { [weak self] in self?.createNewFile(name: "새 문서.md") })
-        newMenu.addItem(block("리치 텍스트 문서") { [weak self] in self?.createNewFile(name: "새 문서.rtf") })
-        newMenu.addItem(block("Shell 스크립트") { [weak self] in self?.createNewFile(name: "새 스크립트.sh") })
-        newMenu.addItem(block("JSON 파일") { [weak self] in self?.createNewFile(name: "새 데이터.json") })
+        for (idx, tpl) in newItemTemplates.enumerated() {
+            if idx == 1 { newMenu.addItem(.separator()) }
+            if let filename = tpl.filename {
+                newMenu.addItem(block(tpl.label) { [weak self] in self?.createNewFile(name: filename) })
+            } else {
+                newMenu.addItem(block(tpl.label) { [weak self] in self?.createNewFolder() })
+            }
+        }
         newItem.submenu = newMenu
         menu.addItem(newItem)
 
