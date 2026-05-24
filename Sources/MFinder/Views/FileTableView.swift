@@ -460,8 +460,11 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
 
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo,
                    proposedRow row: Int, proposedDropOperation op: NSTableView.DropOperation) -> NSDragOperation {
-        // Determine drop target folder.
-        let targetURL: URL? = (op == .on && row < items.count && items[row].isDirectory)
+        // Determine drop target folder. `row` arrives as -1 for drops on
+        // the empty area, and AppKit can occasionally hand us a stale row
+        // index right after an FSEvent-triggered reload shrank the list —
+        // so check both bounds before indexing.
+        let targetURL: URL? = (op == .on && row >= 0 && row < items.count && items[row].isDirectory)
             ? items[row].url
             : parent.nav.currentURL
 
