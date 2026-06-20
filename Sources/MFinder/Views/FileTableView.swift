@@ -397,6 +397,13 @@ final class FileNSTableView: NSTableView, NSMenuItemValidation {
 
     /// Finder-style: clicking on an already-selected single row, after the
     /// double-click window has passed, starts an inline rename.
+    /// Stops a queued click-and-pause rename (e.g. when a drag begins).
+    func cancelPendingRename() {
+        renameTimer?.invalidate()
+        renameTimer = nil
+        pendingRenameRow = -1
+    }
+
     override func mouseDown(with event: NSEvent) {
         // Cancel any pending rename when a new click occurs (e.g. double-click).
         renameTimer?.invalidate()
@@ -453,6 +460,9 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         guard row >= 0, row < items.count else { return nil }
+        // A drag is starting — cancel the click-and-pause rename timer so it
+        // can't fire mid-drag and open a stray edit field.
+        (tableView as? FileNSTableView)?.cancelPendingRename()
         return items[row].url as NSURL
     }
 
@@ -530,7 +540,21 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
         for src in urls {
             // Skip self-drop or into own parent.
             if src.standardizedFileURL == dst.standardizedFileURL { continue }
-            let target = uniqueDestinationName(src.lastPathComponent, in: dst)
+            let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
+            let sameLocation = plainTarget.standardizedFileURL == src.standardizedFileURL
+            let target: URL
+            if sameLocation {
+                // Dropped back into its own folder: a move is a no-op; a copy
+                // duplicates rather than overwriting the source onto itself.
+                if shouldMove { continue }
+                target = uniqueDestinationName(src.lastPathComponent, in: dst)
+            } else {
+                // Overwrite an existing same-named item at the destination.
+                if FileManager.default.fileExists(atPath: plainTarget.path) {
+                    try? FileManager.default.removeItem(at: plainTarget)
+                }
+                target = plainTarget
+            }
             do {
                 if shouldMove {
                     try FileManager.default.moveItem(at: src, to: target)

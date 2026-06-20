@@ -127,11 +127,26 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         var created: [URL] = []
         var firstError: Error?
         for entry in entries {
-            let dst = uniqueDestination(for: entry.url, in: destination)
+            let target = destination.appendingPathComponent(entry.url.lastPathComponent)
+            let sameLocation = target.standardizedFileURL == entry.url.standardizedFileURL
             do {
+                let dst: URL
                 if entry.isCut {
+                    // Cut + paste into the same folder is a no-op.
+                    if sameLocation { continue }
+                    // Overwrite an existing same-named item at the destination.
+                    if fm.fileExists(atPath: target.path) { try? fm.removeItem(at: target) }
+                    dst = target
                     try fm.moveItem(at: entry.url, to: dst)
+                } else if sameLocation {
+                    // Copy + paste into the same folder → make a duplicate, never
+                    // overwrite the source onto itself.
+                    dst = uniqueDestination(for: entry.url, in: destination)
+                    try fm.copyItem(at: entry.url, to: dst)
                 } else {
+                    // Overwrite an existing same-named item at the destination.
+                    if fm.fileExists(atPath: target.path) { try? fm.removeItem(at: target) }
+                    dst = target
                     try fm.copyItem(at: entry.url, to: dst)
                 }
                 created.append(dst)

@@ -1278,7 +1278,18 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 let stdDst = dst.standardizedFileURL
                 if stdSrc == stdDst { continue }
                 if !shouldCopy, stdSrc.deletingLastPathComponent() == stdDst { continue }
-                let target = uniqueChildName(in: dst, base: src.lastPathComponent)
+                let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
+                let target: URL
+                if plainTarget.standardizedFileURL == stdSrc {
+                    // Copy into its own parent → duplicate, never overwrite self.
+                    target = uniqueChildName(in: dst, base: src.lastPathComponent)
+                } else {
+                    // Overwrite an existing same-named item at the destination.
+                    if FileManager.default.fileExists(atPath: plainTarget.path) {
+                        try? FileManager.default.removeItem(at: plainTarget)
+                    }
+                    target = plainTarget
+                }
                 do {
                     if shouldCopy {
                         try FileManager.default.copyItem(at: src, to: target)
@@ -1306,6 +1317,9 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
             guard let node = item as? SidebarItem, let url = node.folderURL else { return nil }
+            // A drag is starting on this row — kill the click-and-pause rename
+            // timer so it can't fire mid-drag and open a stray edit field.
+            cancelPendingRename()
             return url as NSURL
         }
 
@@ -1328,6 +1342,81 @@ final class SidebarNSOutlineView: NSOutlineView {
     weak var coordinator: SidebarOutlineRepresentable.Coordinator?
 
     override var acceptsFirstResponder: Bool { true }
+
+    // MARK: - Spring-loaded auto-expand (delayed, Explorer-style)
+    //
+    // AppKit's built-in spring-loading pops a collapsed folder open almost
+    // instantly when a drag hovers it. Windows Explorer waits ~1–2s first, so
+    // we take ownership of the timing: each tick we re-collapse anything AppKit
+    // expanded early and only expand once our own dwell timer fires.
+
+    /// Pointer dwell required before a hovered collapsed folder expands.
+    private let springLoadDelay: TimeInterval = 1.2
+    private var springTimer: Timer?
+    private var springItem: SidebarItem?
+    /// Folders that may stay open during this drag — ones we expanded, plus
+    /// ones already open before the drag reached them.
+    private var springAuthorized = Set<SidebarItem>()
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let op = super.draggingUpdated(sender)
+        let point = convert(sender.draggingLocation, from: nil)
+        let row = self.row(at: point)
+        guard row >= 0,
+              let item = self.item(atRow: row) as? SidebarItem,
+              isExpandable(item) else {
+            cancelSpringTimer()
+            return op
+        }
+        if springAuthorized.contains(item) {
+            if springItem != item { cancelSpringTimer() }
+            return op
+        }
+        if isItemExpanded(item) {
+            if springItem == item {
+                // AppKit's own spring-load fired early — undo it; our timer owns
+                // the timing.
+                collapseItem(item)
+            } else {
+                // Folder was already open before the drag reached it: leave it.
+                springAuthorized.insert(item)
+                cancelSpringTimer()
+                return op
+            }
+        }
+        if springItem != item {
+            springItem = item
+            springTimer?.invalidate()
+            springTimer = Timer.scheduledTimer(withTimeInterval: springLoadDelay,
+                                                repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self = self, let target = self.springItem else { return }
+                    self.springAuthorized.insert(target)
+                    self.expandItem(target)
+                    self.springTimer = nil
+                }
+            }
+        }
+        return op
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        cancelSpringTimer()
+        springAuthorized.removeAll()
+        super.draggingExited(sender)
+    }
+
+    override func concludeDragOperation(_ sender: NSDraggingInfo?) {
+        cancelSpringTimer()
+        springAuthorized.removeAll()
+        super.concludeDragOperation(sender)
+    }
+
+    private func cancelSpringTimer() {
+        springTimer?.invalidate()
+        springTimer = nil
+        springItem = nil
+    }
 
     override func mouseDown(with event: NSEvent) {
         // Let AppKit handle the actual selection first so `selectedRow`
