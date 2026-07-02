@@ -1297,6 +1297,18 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             let shouldCopy = NSEvent.modifierFlags.contains(.option)
             let pb = info.draggingPasteboard
             guard let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else { return false }
+            // Count overwrite conflicts up front so each dialog can offer a
+            // blanket answer for the rest (same UX as clipboard paste).
+            var conflictsLeft = urls.filter { src in
+                let stdSrc = src.standardizedFileURL
+                let stdDst = dst.standardizedFileURL
+                guard stdSrc != stdDst else { return false }
+                if !shouldCopy, stdSrc.deletingLastPathComponent() == stdDst { return false }
+                let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
+                return plainTarget.standardizedFileURL != stdSrc
+                    && FileManager.default.fileExists(atPath: plainTarget.path)
+            }.count
+            var blanket: FileConflictChoice?
             var firstErr: Error?
             var landed: [URL] = []
             for src in urls {
@@ -1310,8 +1322,14 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     // Copy into its own parent → duplicate, never overwrite self.
                     target = uniqueChildName(in: dst, base: src.lastPathComponent)
                 } else {
-                    // Overwrite an existing same-named item at the destination.
+                    // A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
                     if FileManager.default.fileExists(atPath: plainTarget.path) {
+                        conflictsLeft -= 1
+                        let choice = blanket ?? askFileConflict(name: src.lastPathComponent,
+                                                                remainingConflicts: conflictsLeft,
+                                                                blanket: &blanket)
+                        if choice == .skip { continue }
+                        if choice == .cancel { break }
                         try? FileManager.default.removeItem(at: plainTarget)
                     }
                     target = plainTarget

@@ -136,7 +136,7 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                 && fm.fileExists(atPath: target.path)
         }.count
 
-        var blanket: ConflictChoice?
+        var blanket: FileConflictChoice?
         var created: [URL] = []
         var firstError: Error?
         var cancelledAtIndex: Int?
@@ -151,9 +151,9 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                     if sameLocation { continue }
                     if fm.fileExists(atPath: target.path) {
                         conflictsLeft -= 1
-                        let choice = blanket ?? askConflict(name: entry.url.lastPathComponent,
-                                                            remainingConflicts: conflictsLeft,
-                                                            blanket: &blanket)
+                        let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
+                                                                remainingConflicts: conflictsLeft,
+                                                                blanket: &blanket)
                         if choice == .skip { continue }
                         if choice == .cancel { cancelledAtIndex = idx; break }
                         try? fm.removeItem(at: target)
@@ -168,9 +168,9 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                 } else {
                     if fm.fileExists(atPath: target.path) {
                         conflictsLeft -= 1
-                        let choice = blanket ?? askConflict(name: entry.url.lastPathComponent,
-                                                            remainingConflicts: conflictsLeft,
-                                                            blanket: &blanket)
+                        let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
+                                                                remainingConflicts: conflictsLeft,
+                                                                blanket: &blanket)
                         if choice == .skip { continue }
                         if choice == .cancel { cancelledAtIndex = idx; break }
                         try? fm.removeItem(at: target)
@@ -194,36 +194,7 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         return created
     }
 
-    private enum ConflictChoice { case overwrite, skip, cancel }
-
-    /// Modal 덮어쓰기 확인. `remainingConflicts` is the number of conflicts still
-    /// coming after this one — when > 0 a suppression checkbox turns this
-    /// answer into a blanket decision for all of them.
-    private func askConflict(name: String, remainingConflicts: Int,
-                             blanket: inout ConflictChoice?) -> ConflictChoice {
-        let alert = NSAlert()
-        alert.messageText = "\"\(name)\"이(가) 이미 있습니다"
-        alert.informativeText = "붙여넣을 위치에 같은 이름의 항목이 있습니다. 덮어쓰면 기존 항목이 삭제되며 되돌릴 수 없습니다."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "덮어쓰기")
-        alert.addButton(withTitle: "건너뛰기")
-        alert.addButton(withTitle: "취소")
-        if remainingConflicts > 0 {
-            alert.showsSuppressionButton = true
-            alert.suppressionButton?.title = "남은 충돌 항목 \(remainingConflicts)개에도 모두 적용"
-        }
-        let response = alert.runModal()
-        let choice: ConflictChoice
-        switch response {
-        case .alertFirstButtonReturn:  choice = .overwrite
-        case .alertSecondButtonReturn: choice = .skip
-        default:                       choice = .cancel
-        }
-        if remainingConflicts > 0, alert.suppressionButton?.state == .on, choice != .cancel {
-            blanket = choice
-        }
-        return choice
-    }
+    // 덮어쓰기 확인 UI lives in FileConflictPrompt.swift (shared with drag-and-drop).
 
     // MARK: - Pasteboard ↔ stack sync
 

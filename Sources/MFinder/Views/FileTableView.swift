@@ -575,6 +575,16 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
             return isInternal
         }()
 
+        // Count overwrite conflicts up front so each dialog can offer a
+        // blanket answer for the rest (same UX as clipboard paste).
+        var conflictsLeft = urls.filter { src in
+            guard src.standardizedFileURL != dst.standardizedFileURL else { return false }
+            let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
+            return plainTarget.standardizedFileURL != src.standardizedFileURL
+                && FileManager.default.fileExists(atPath: plainTarget.path)
+        }.count
+        var blanket: FileConflictChoice?
+
         var landed: [URL] = []
         var firstErr: Error?
         for src in urls {
@@ -589,8 +599,14 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
                 if shouldMove { continue }
                 target = uniqueDestinationName(src.lastPathComponent, in: dst)
             } else {
-                // Overwrite an existing same-named item at the destination.
+                // A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
                 if FileManager.default.fileExists(atPath: plainTarget.path) {
+                    conflictsLeft -= 1
+                    let choice = blanket ?? askFileConflict(name: src.lastPathComponent,
+                                                            remainingConflicts: conflictsLeft,
+                                                            blanket: &blanket)
+                    if choice == .skip { continue }
+                    if choice == .cancel { break }
                     try? FileManager.default.removeItem(at: plainTarget)
                 }
                 target = plainTarget

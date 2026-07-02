@@ -17,7 +17,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Spotlight Search** — Backed by NSMetadataQuery with token parsing: `-exclude` words, `"quoted phrases"`, content + filename matching. Inline snippet preview in the file list
 - **Live File-System Watcher** — `kqueue`-based vnode watcher reliably refreshes the file list and tree branches as the contents change on disk (including from Finder or shell)
 - **Clipboard Stack** — Cut, copy, and paste multiple selections; a single ⌘V drains the entire stack into the current folder. Cut items are dimmed in both the file list and the sidebar tree. The stack is shared across every running MFinder instance via the system pasteboard, so a multi-file copy in one window is fully paste-able in any other
-- **Drag & Drop** — Drop file URLs from anywhere (Finder, other apps, this app's panes); hold Option to copy, default is move. Drop onto a tree folder to send items there. Dropping a same-named item overwrites the existing one; dropping back into its own folder duplicates (copy) or is a no-op (move). Hovering a collapsed sidebar folder during a drag spring-loads it open after a short dwell (Explorer-style ~1.2s)
+- **Drag & Drop** — Drop file URLs from anywhere (Finder, other apps, this app's panes); hold Option to copy, default is move. Drop onto a tree folder to send items there. Dropping a same-named item prompts 덮어쓰기 / 건너뛰기 / 취소 (with apply-to-remaining for bulk drops); dropping back into its own folder duplicates (copy) or is a no-op (move). Hovering a collapsed sidebar folder during a drag spring-loads it open after a short dwell (Explorer-style ~1.2s)
 - **Quick Look** — Spacebar previews the selection in the system Quick Look panel
 - **Archive (Bandizip)** — Right-click → Bandizip submenu to compress to .zip/.7z/.tar.gz/etc., or extract to here / to a subfolder / to a chosen location. RAR / 7z fall back to Bandizip.app when no CLI extractor (`unrar`, `unar`, `7z`) is installed
 - **Send to Bandizip** — "보내기 → Bandizip" hands selected files off to Bandizip.app when it's installed
@@ -33,7 +33,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Connect to Server** — 이동 → "서버에 연결…" (⌘K) or right-click on the 네트워크 sidebar section opens a Finder-style dialog for `smb://`, `afp://`, `ftp://`, `nfs://`, and WebDAV URLs. Mounts via `NetFS.framework` so the system's credentials sheet and Keychain are reused. Recent servers are persisted and listed under the 네트워크 section — right-click → 연결 / 연결 끊기 / 목록에서 제거
 - **Themes** — 설정 (⌘,) offers built-in 라이트/다크 themes plus a custom theme editor: pick window/bar/content backgrounds, selection, accent, and text colors, name the theme, and save it. Custom themes persist across launches
 - **Font Size** — Adjustable base font size (10–18pt) for the details table, list/icon modes, and sidebar tree via 설정 slider or 보기 → 글자 크게/작게/기본 (⌘= / ⌘- / ⌘0); row heights follow
-- **Paste Overwrite Prompt** — Pasting over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. 취소 keeps the unpasted entries in the clipboard stack
+- **Overwrite Prompt** — Pasting or dropping over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. Cancelling a paste keeps the unpasted entries in the clipboard stack
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install
