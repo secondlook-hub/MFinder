@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @StateObject private var tabs = TabsState()
     @EnvironmentObject var updateChecker: UpdateChecker
+    @ObservedObject private var themes = ThemeService.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,9 +19,9 @@ struct ContentView: View {
                 .environmentObject(tabs.active.tree)
                 .environmentObject(tabs)
         }
-        .background(Color(red: 0.94, green: 0.94, blue: 0.94))
+        .background(themes.theme.windowBackground.color)
         .frame(minWidth: 900, minHeight: 600)
-        .preferredColorScheme(.light)
+        .preferredColorScheme(themes.theme.isDark ? .dark : .light)
         .onReceive(NotificationCenter.default.publisher(for: .mfinderNewTab)) { notif in
             if let url = notif.object as? URL {
                 tabs.newTab(at: url)

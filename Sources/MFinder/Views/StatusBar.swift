@@ -3,6 +3,7 @@ import SwiftUI
 struct StatusBar: View {
     @EnvironmentObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
+    @ObservedObject private var themes = ThemeService.shared
     @State private var showStackPopover = false
 
     var body: some View {
@@ -43,7 +44,7 @@ struct StatusBar: View {
                     Image(systemName: "list.dash")
                         .font(.system(size: 11))
                         .padding(2)
-                        .background(nav.viewMode == .details ? Color.accentColor.opacity(0.25) : Color.clear)
+                        .background(nav.viewMode == .details ? themes.theme.accent.color.opacity(0.25) : Color.clear)
                 }
                 .buttonStyle(.plain)
                 Button {
@@ -52,15 +53,16 @@ struct StatusBar: View {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 11))
                         .padding(2)
-                        .background(nav.viewMode == .largeIcons ? Color.accentColor.opacity(0.25) : Color.clear)
+                        .background(nav.viewMode == .largeIcons ? themes.theme.accent.color.opacity(0.25) : Color.clear)
                 }
                 .buttonStyle(.plain)
             }
         }
         .font(.system(size: 11))
+        .foregroundColor(themes.theme.text.color)
         .padding(.horizontal, 8)
         .frame(height: 22)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(themes.theme.barBackground.color)
         .overlay(Divider(), alignment: .top)
     }
 
@@ -74,7 +76,7 @@ struct StatusBar: View {
                 Image(systemName: clipboardSymbol)
                     .font(.system(size: 10))
                 Text(clipboardLabel)
-                    .foregroundColor(Color(white: 0.25))
+                    .foregroundColor(themes.theme.text.color)
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 1)

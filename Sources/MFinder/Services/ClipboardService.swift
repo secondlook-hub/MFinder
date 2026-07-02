@@ -111,9 +111,13 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
 
     /// Drains the stack into `destination`. Each entry is moved (cut) or
     /// copied based on its `isCut` flag. Returns the URLs that were
-    /// successfully created at the destination. Always clears the stack
-    /// (in both this process and the system pasteboard, so all instances
-    /// agree) after attempting all items so users don't double-paste.
+    /// successfully created at the destination.
+    ///
+    /// A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
+    /// With several conflicts the dialog offers "남은 항목 모두에 적용" so one
+    /// answer can cover the rest. 취소 keeps the not-yet-pasted entries in the
+    /// stack (they're still pending); otherwise the stack is cleared in both
+    /// this process and the system pasteboard so users don't double-paste.
     @discardableResult
     func paste(into destination: URL) throws -> [URL] {
         refreshFromPasteboardIfChanged()
@@ -124,9 +128,20 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         }
 
         let fm = FileManager.default
+        // Count conflicts up front so each dialog can say how many are left
+        // and offer a blanket answer for them.
+        var conflictsLeft = entries.filter { entry in
+            let target = destination.appendingPathComponent(entry.url.lastPathComponent)
+            return target.standardizedFileURL != entry.url.standardizedFileURL
+                && fm.fileExists(atPath: target.path)
+        }.count
+
+        var blanket: ConflictChoice?
         var created: [URL] = []
         var firstError: Error?
-        for entry in entries {
+        var cancelledAtIndex: Int?
+
+        for (idx, entry) in entries.enumerated() {
             let target = destination.appendingPathComponent(entry.url.lastPathComponent)
             let sameLocation = target.standardizedFileURL == entry.url.standardizedFileURL
             do {
@@ -134,8 +149,15 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                 if entry.isCut {
                     // Cut + paste into the same folder is a no-op.
                     if sameLocation { continue }
-                    // Overwrite an existing same-named item at the destination.
-                    if fm.fileExists(atPath: target.path) { try? fm.removeItem(at: target) }
+                    if fm.fileExists(atPath: target.path) {
+                        conflictsLeft -= 1
+                        let choice = blanket ?? askConflict(name: entry.url.lastPathComponent,
+                                                            remainingConflicts: conflictsLeft,
+                                                            blanket: &blanket)
+                        if choice == .skip { continue }
+                        if choice == .cancel { cancelledAtIndex = idx; break }
+                        try? fm.removeItem(at: target)
+                    }
                     dst = target
                     try fm.moveItem(at: entry.url, to: dst)
                 } else if sameLocation {
@@ -144,8 +166,15 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                     dst = uniqueDestination(for: entry.url, in: destination)
                     try fm.copyItem(at: entry.url, to: dst)
                 } else {
-                    // Overwrite an existing same-named item at the destination.
-                    if fm.fileExists(atPath: target.path) { try? fm.removeItem(at: target) }
+                    if fm.fileExists(atPath: target.path) {
+                        conflictsLeft -= 1
+                        let choice = blanket ?? askConflict(name: entry.url.lastPathComponent,
+                                                            remainingConflicts: conflictsLeft,
+                                                            blanket: &blanket)
+                        if choice == .skip { continue }
+                        if choice == .cancel { cancelledAtIndex = idx; break }
+                        try? fm.removeItem(at: target)
+                    }
                     dst = target
                     try fm.copyItem(at: entry.url, to: dst)
                 }
@@ -154,9 +183,46 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                 if firstError == nil { firstError = error }
             }
         }
-        commit([])
-        if created.isEmpty, let err = firstError { throw err }
+
+        if let stopIdx = cancelledAtIndex {
+            // Keep the entry the user cancelled on plus everything after it.
+            commit(Array(entries[stopIdx...]))
+        } else {
+            commit([])
+        }
+        if created.isEmpty, cancelledAtIndex == nil, let err = firstError { throw err }
         return created
+    }
+
+    private enum ConflictChoice { case overwrite, skip, cancel }
+
+    /// Modal 덮어쓰기 확인. `remainingConflicts` is the number of conflicts still
+    /// coming after this one — when > 0 a suppression checkbox turns this
+    /// answer into a blanket decision for all of them.
+    private func askConflict(name: String, remainingConflicts: Int,
+                             blanket: inout ConflictChoice?) -> ConflictChoice {
+        let alert = NSAlert()
+        alert.messageText = "\"\(name)\"이(가) 이미 있습니다"
+        alert.informativeText = "붙여넣을 위치에 같은 이름의 항목이 있습니다. 덮어쓰면 기존 항목이 삭제되며 되돌릴 수 없습니다."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "덮어쓰기")
+        alert.addButton(withTitle: "건너뛰기")
+        alert.addButton(withTitle: "취소")
+        if remainingConflicts > 0 {
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "남은 충돌 항목 \(remainingConflicts)개에도 모두 적용"
+        }
+        let response = alert.runModal()
+        let choice: ConflictChoice
+        switch response {
+        case .alertFirstButtonReturn:  choice = .overwrite
+        case .alertSecondButtonReturn: choice = .skip
+        default:                       choice = .cancel
+        }
+        if remainingConflicts > 0, alert.suppressionButton?.state == .on, choice != .cancel {
+            blanket = choice
+        }
+        return choice
     }
 
     // MARK: - Pasteboard ↔ stack sync

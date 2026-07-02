@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct FileListView: View {
     @EnvironmentObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
+    @ObservedObject private var themes = ThemeService.shared
 
     var body: some View {
         Group {
@@ -19,7 +20,7 @@ struct FileListView: View {
             case .content:          contentView
             }
         }
-        .background(Color.white)
+        .background(themes.theme.contentBackground.color)
         .contextMenu { emptySpaceMenu() }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderRenameSelected)) { _ in
             // Triggered by F2 — start rename of the single selected item.
@@ -85,16 +86,16 @@ struct FileListView: View {
             if renaming {
                 RenameTextField(
                     item: item,
-                    fontSize: 12,
+                    fontSize: themes.fontSize,
                     alignment: .left,
                     onCommit: { commitRename(item, newName: $0) },
                     onCancel: { nav.renamingURL = nil }
                 )
-                .frame(width: 170, height: 18)
+                .frame(width: 170, height: themes.fontSize + 6)
             } else {
                 Text(item.name)
-                    .font(.system(size: 12))
-                    .foregroundColor(.black)
+                    .font(.system(size: themes.fontSize))
+                    .foregroundColor(themes.theme.text.color)
                     .lineLimit(1)
             }
         }
@@ -102,7 +103,7 @@ struct FileListView: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 1)
         .frame(width: 200, alignment: .leading)
-        .background(selected && !renaming ? Color(red: 0.92, green: 0.92, blue: 0.92) : Color.clear)
+        .background(selected && !renaming ? themes.theme.selection.color : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { open(item) }
         .onTapGesture { handleClick(item) }
@@ -135,7 +136,7 @@ struct FileListView: View {
             if renaming {
                 RenameTextField(
                     item: item,
-                    fontSize: 11,
+                    fontSize: themes.secondaryFontSize,
                     alignment: .center,
                     onCommit: { commitRename(item, newName: $0) },
                     onCancel: { nav.renamingURL = nil }
@@ -143,8 +144,8 @@ struct FileListView: View {
                 .frame(width: max(size + 24, 100), height: 36)
             } else {
                 Text(item.name)
-                    .font(.system(size: 11))
-                    .foregroundColor(.black)
+                    .font(.system(size: themes.secondaryFontSize))
+                    .foregroundColor(themes.theme.text.color)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .frame(width: size + 16)
@@ -152,7 +153,7 @@ struct FileListView: View {
         }
         .opacity(cut ? 0.45 : 1.0)
         .padding(4)
-        .background(selected && !renaming ? Color(red: 0.92, green: 0.92, blue: 0.92) : Color.clear)
+        .background(selected && !renaming ? themes.theme.selection.color : Color.clear)
         .cornerRadius(2)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { open(item) }
@@ -187,18 +188,18 @@ struct FileListView: View {
                 if renaming {
                     RenameTextField(
                         item: item,
-                        fontSize: 12,
+                        fontSize: themes.fontSize,
                         alignment: .left,
                         onCommit: { commitRename(item, newName: $0) },
                         onCancel: { nav.renamingURL = nil }
                     )
                     .frame(height: 20)
                 } else {
-                    Text(item.name).font(.system(size: 12, weight: .semibold)).foregroundColor(.black).lineLimit(1)
+                    Text(item.name).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color).lineLimit(1)
                 }
-                Text(item.typeDescription).font(.system(size: 11)).foregroundColor(Color(white: 0.35)).lineLimit(1)
+                Text(item.typeDescription).font(.system(size: themes.secondaryFontSize)).foregroundColor(themes.theme.secondaryText.color).lineLimit(1)
                 if !item.isDirectory {
-                    Text(item.sizeString).font(.system(size: 11)).foregroundColor(Color(white: 0.35))
+                    Text(item.sizeString).font(.system(size: themes.secondaryFontSize)).foregroundColor(themes.theme.secondaryText.color)
                 }
             }
             Spacer()
@@ -206,7 +207,7 @@ struct FileListView: View {
         .opacity(cut ? 0.45 : 1.0)
         .padding(6)
         .frame(height: 64)
-        .background(selected && !renaming ? Color(red: 0.92, green: 0.92, blue: 0.92) : Color.clear)
+        .background(selected && !renaming ? themes.theme.selection.color : Color.clear)
         .cornerRadius(2)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { open(item) }
@@ -230,14 +231,14 @@ struct FileListView: View {
                             if renaming {
                                 RenameTextField(
                                     item: item,
-                                    fontSize: 12,
+                                    fontSize: themes.fontSize,
                                     alignment: .left,
                                     onCommit: { commitRename(item, newName: $0) },
                                     onCancel: { nav.renamingURL = nil }
                                 )
                                 .frame(height: 22)
                             } else {
-                                Text(item.name).font(.system(size: 12, weight: .semibold)).foregroundColor(.black)
+                                Text(item.name).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color)
                             }
                             HStack(spacing: 16) {
                                 Text("수정한 날짜: \(item.modificationString)")
@@ -246,14 +247,14 @@ struct FileListView: View {
                                     Text("크기: \(item.sizeString)")
                                 }
                             }
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(white: 0.35))
+                            .font(.system(size: themes.secondaryFontSize))
+                            .foregroundColor(themes.theme.secondaryText.color)
                         }
                         Spacer()
                     }
                     .opacity(cut ? 0.45 : 1.0)
                     .padding(8)
-                    .background(selected && !renaming ? Color(red: 0.92, green: 0.92, blue: 0.92) : Color.clear)
+                    .background(selected && !renaming ? themes.theme.selection.color : Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { open(item) }
                     .onTapGesture { handleClick(item) }

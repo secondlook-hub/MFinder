@@ -31,6 +31,9 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
 - **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs and sidebar tree. The clipboard stack is unified across all running instances. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
 - **Connect to Server** — 이동 → "서버에 연결…" (⌘K) or right-click on the 네트워크 sidebar section opens a Finder-style dialog for `smb://`, `afp://`, `ftp://`, `nfs://`, and WebDAV URLs. Mounts via `NetFS.framework` so the system's credentials sheet and Keychain are reused. Recent servers are persisted and listed under the 네트워크 section — right-click → 연결 / 연결 끊기 / 목록에서 제거
+- **Themes** — 설정 (⌘,) offers built-in 라이트/다크 themes plus a custom theme editor: pick window/bar/content backgrounds, selection, accent, and text colors, name the theme, and save it. Custom themes persist across launches
+- **Font Size** — Adjustable base font size (10–18pt) for the details table, list/icon modes, and sidebar tree via 설정 slider or 보기 → 글자 크게/작게/기본 (⌘= / ⌘- / ⌘0); row heights follow
+- **Paste Overwrite Prompt** — Pasting over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. 취소 keeps the unpasted entries in the clipboard stack
 - **Korean UI** — Native Korean menu labels throughout
 
 ## Install

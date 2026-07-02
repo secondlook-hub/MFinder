@@ -58,7 +58,7 @@ struct ClipboardStackView: View {
         HStack(spacing: 8) {
             Image(systemName: entry.isCut ? "scissors" : "doc.on.doc")
                 .font(.system(size: 11))
-                .foregroundColor(entry.isCut ? .orange : Color(red: 0.0, green: 0.47, blue: 0.84))
+                .foregroundColor(entry.isCut ? .orange : ThemeService.shared.theme.accent.color)
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.url.lastPathComponent)

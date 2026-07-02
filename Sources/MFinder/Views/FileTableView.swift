@@ -8,6 +8,7 @@ import AppKit
 struct FileTableView: NSViewRepresentable {
     @ObservedObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
+    @ObservedObject private var themes = ThemeService.shared
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -18,12 +19,14 @@ struct FileTableView: NSViewRepresentable {
         scrollView.autohidesScrollers = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = .white
+        scrollView.backgroundColor = ThemeService.shared.theme.contentBackground.nsColor
 
         let tableView = FileNSTableView()
         tableView.fileCoordinator = context.coordinator
         tableView.style = .plain
-        tableView.usesAlternatingRowBackgroundColors = true
+        // Zebra stripes are drawn by FileNSTableRowView from the theme's
+        // content colors — the system alternating colors can't be themed.
+        tableView.usesAlternatingRowBackgroundColors = false
         tableView.gridStyleMask = []
         tableView.rowHeight = 22
         tableView.intercellSpacing = NSSize(width: 0, height: 0)
@@ -81,6 +84,18 @@ struct FileTableView: NSViewRepresentable {
         let coord = context.coordinator
         coord.parent = self
 
+        // Theme / font sync — cells pull colors and fonts from ThemeService
+        // while being configured, so a change just needs backgrounds + reload.
+        let theme = themes.theme
+        let fontChanged = coord.lastFontSize != themes.fontSize
+        let themeChanged = coord.lastTheme != theme
+        if themeChanged {
+            coord.lastTheme = theme
+            scrollView.backgroundColor = theme.contentBackground.nsColor
+            tableView.backgroundColor = theme.contentBackground.nsColor
+        }
+        if fontChanged { coord.lastFontSize = themes.fontSize }
+
         // Apply search state BEFORE reloadData so cells built by the reload see
         // the current searchQuery/searchRoot. Doing this after the reload meant
         // cells were built with the previous search state and snippets only
@@ -99,8 +114,9 @@ struct FileTableView: NSViewRepresentable {
             coord.cutURLs = newCutSet
         }
 
-        // Reload when items, search context, or cut highlighting changed.
-        if coord.lastDataVersion != nav.dataVersion || searchStateChanged || cutSetChanged {
+        // Reload when items, search context, cut highlighting, or styling changed.
+        if coord.lastDataVersion != nav.dataVersion || searchStateChanged || cutSetChanged
+            || themeChanged || fontChanged {
             coord.lastDataVersion = nav.dataVersion
             coord.items = nav.filteredItems
             tableView.reloadData()
@@ -112,8 +128,9 @@ struct FileTableView: NSViewRepresentable {
         if let locCol = tableView.tableColumn(withIdentifier: .init("location")) {
             locCol.isHidden = !inSearch
         }
-        // Taller rows in search mode to fit the snippet line.
-        let desiredHeight: CGFloat = inSearch ? 44 : 22
+        // Taller rows in search mode to fit the snippet line. Base height
+        // follows the user's font size preference.
+        let desiredHeight: CGFloat = inSearch ? themes.rowHeight * 2 : themes.rowHeight
         if abs(tableView.rowHeight - desiredHeight) > 0.5 {
             tableView.rowHeight = desiredHeight
             tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<coord.items.count))
@@ -210,12 +227,15 @@ extension FileTableView {
         weak var tableView: NSTableView?
         var items: [FileItem] = []
         var lastDataVersion: Int = -1
+        var lastTheme: Theme? = nil
+        var lastFontSize: CGFloat = -1
         var lastRenamingURL: URL? = nil
         var searchRoot: URL? = nil
         var searchQuery: String? = nil
         var cutURLs: Set<URL> = []
         var suppressSelectionNotification = false
         var suppressSortNotification = false
+        let renameFocusWatcher = EditFocusWatcher()
 
         init(_ parent: FileTableView) { self.parent = parent }
 
@@ -308,6 +328,12 @@ extension FileTableView {
             tf.focusRingType = .default
             tv.scrollRowToVisible(row)
             tv.editColumn(0, row: row, with: nil, select: true)
+            // End the edit if focus leaves the app/window — forcing the table
+            // back to first responder runs the normal commit/cancel path.
+            renameFocusWatcher.begin(window: tv.window) { [weak tv] in
+                guard let tv, tv.window?.firstResponder is NSText else { return }
+                tv.window?.makeFirstResponder(tv)
+            }
             // After editColumn, the field editor is active. Select the basename only for files.
             let item = items[row]
             if !item.isDirectory,
@@ -330,20 +356,34 @@ extension FileTableView {
 
 // MARK: - Custom row view providing Win11-style light gray selection
 
-/// Replaces NSTableView's default system-blue selection with a subtle light
-/// gray that doesn't fight the yellow snippet highlight. interiorBackgroundStyle
-/// stays `.normal` so cell text remains its usual black instead of getting
-/// inverted to white as the system would do for an emphasized blue selection.
+/// Replaces NSTableView's default system-blue selection with the theme's
+/// subtle selection fill that doesn't fight the yellow snippet highlight.
+/// interiorBackgroundStyle stays `.normal` so cell text keeps its themed
+/// color instead of getting inverted to white as the system would do for an
+/// emphasized blue selection. Also draws the theme-derived zebra stripe
+/// (system alternating colors can't be themed, so we own the background).
 final class FileNSTableRowView: NSTableRowView {
+    var zebraColor: NSColor?
+
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        if let zebra = zebraColor {
+            zebra.setFill()
+            dirtyRect.fill()
+        } else {
+            super.drawBackground(in: dirtyRect)
+        }
+    }
 
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
-        // Slightly darker when the table view has focus, lighter otherwise —
+        let theme = ThemeService.shared.theme
+        // Slightly stronger when the table view has focus, lighter otherwise —
         // matches Win11 behaviour where an unfocused selection is more muted.
-        let color: NSColor = isEmphasized
-            ? NSColor(red: 0.86, green: 0.86, blue: 0.86, alpha: 1.0)   // #DBDBDB
-            : NSColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0)   // #EBEBEB
+        let color = isEmphasized
+            ? theme.selectionEmphasized.nsColor
+            : theme.selection.nsColor
         color.setFill()
         let inset = bounds.insetBy(dx: 2, dy: 0)
         NSBezierPath(roundedRect: inset, xRadius: 3, yRadius: 3).fill()
@@ -625,13 +665,14 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
     /// Builds an attributed snippet with every include-token highlighted in
     /// light yellow + bold. Case-insensitive, multi-occurrence per token.
     private func highlightedSnippet(_ snippet: String, tokens: [String]) -> NSAttributedString {
+        let theming = ThemeService.shared
         let attr = NSMutableAttributedString(string: snippet, attributes: [
-            .font: NSFont.systemFont(ofSize: 10),
-            .foregroundColor: NSColor(white: 0.35, alpha: 1.0)
+            .font: NSFont.systemFont(ofSize: theming.snippetFontSize),
+            .foregroundColor: theming.theme.secondaryText.nsColor
         ])
         let ns = snippet as NSString
         let bg = NSColor(red: 1.0, green: 0.92, blue: 0.5, alpha: 0.85)
-        let bold = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        let bold = NSFont.systemFont(ofSize: theming.snippetFontSize, weight: .semibold)
         for token in tokens where !token.isEmpty {
             var searchRange = NSRange(location: 0, length: ns.length)
             while searchRange.location < ns.length {
@@ -682,9 +723,10 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             cell.addSubview(img)
 
             // Filename — primary line. Editable mode is flipped on for inline rename.
+            // Font/color are (re)applied on every configure pass below so theme
+            // and font-size changes restyle recycled cells.
             let tf = NSTextField()
             tf.translatesAutoresizingMaskIntoConstraints = false
-            tf.font = NSFont.systemFont(ofSize: 12)
             tf.isEditable = false
             tf.isSelectable = false
             tf.isBezeled = false
@@ -701,7 +743,6 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             let snippetTF = NSTextField()
             snippetTF.identifier = .init("snippet")
             snippetTF.translatesAutoresizingMaskIntoConstraints = false
-            snippetTF.font = NSFont.systemFont(ofSize: 10)
             snippetTF.isEditable = false
             snippetTF.isSelectable = false
             snippetTF.isBezeled = false
@@ -710,7 +751,6 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             snippetTF.lineBreakMode = .byTruncatingTail
             snippetTF.usesSingleLineMode = true
             snippetTF.cell?.truncatesLastVisibleLine = true
-            snippetTF.textColor = NSColor(white: 0.35, alpha: 1.0)
 
             // Vertical stack auto-collapses to the filename when the snippet is hidden,
             // so the same cell works for both 22px normal rows and 44px search rows.
@@ -734,7 +774,8 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         }
 
         // Reset editable state on reuse (previously-renamed cell shouldn't
-        // reappear in edit mode).
+        // reappear in edit mode) and re-apply theme styling.
+        let theming = ThemeService.shared
         if let tf = cell.textField {
             tf.isEditable = false
             tf.isSelectable = false
@@ -742,6 +783,8 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             tf.drawsBackground = false
             tf.backgroundColor = nil
             tf.focusRingType = .none
+            tf.font = NSFont.systemFont(ofSize: theming.fontSize)
+            tf.textColor = theming.theme.text.nsColor
         }
         cell.imageView?.image = item.icon
         cell.textField?.stringValue = item.name
@@ -757,6 +800,8 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
 
         // Toggle snippet line visibility based on search state.
         guard let snippetTF = findSnippetField(in: cell) else { return cell }
+        snippetTF.font = NSFont.systemFont(ofSize: theming.snippetFontSize)
+        snippetTF.textColor = theming.theme.secondaryText.nsColor
         let tokens = parent.nav.searchTokens
         if !tokens.includes.isEmpty {
             snippetTF.isHidden = false
@@ -796,7 +841,6 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             cell.identifier = nid
             let label = NSTextField(labelWithString: "")
             label.translatesAutoresizingMaskIntoConstraints = false
-            label.font = NSFont.systemFont(ofSize: 12)
             label.lineBreakMode = .byTruncatingTail
             label.usesSingleLineMode = true
             cell.textField = label
@@ -807,6 +851,9 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
                 label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
             ])
         }
+        let theming = ThemeService.shared
+        cell.textField?.font = NSFont.systemFont(ofSize: theming.fontSize)
+        cell.textField?.textColor = theming.theme.text.nsColor
         cell.textField?.alignment = alignment
         cell.textField?.stringValue = text
         return cell
@@ -824,10 +871,15 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         AppFocus.area = .fileList
     }
 
-    /// Returns our custom row view so selected rows render in light gray
-    /// (Win11 style) instead of the default system blue.
+    /// Returns our custom row view so selected rows render in the theme's
+    /// selection fill (Win11 style) instead of the default system blue.
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        FileNSTableRowView()
+        let rowView = FileNSTableRowView()
+        let theme = ThemeService.shared.theme
+        rowView.zebraColor = row % 2 == 1
+            ? theme.contentBackgroundAlternate.nsColor
+            : theme.contentBackground.nsColor
+        return rowView
     }
 }
 
@@ -836,6 +888,7 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
 extension FileTableView.Coordinator: NSTextFieldDelegate {
     func controlTextDidEndEditing(_ obj: Notification) {
         guard let tf = obj.object as? NSTextField, let tv = tableView else { return }
+        renameFocusWatcher.end()
         defer {
             tf.isEditable = false
             tf.isSelectable = false

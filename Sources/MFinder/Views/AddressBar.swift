@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddressBar: View {
     @EnvironmentObject var nav: NavigationState
+    @ObservedObject private var themes = ThemeService.shared
     @State private var editing = false
     @State private var editedPath: String = ""
     @FocusState private var searchFocused: Bool
@@ -15,7 +16,7 @@ struct AddressBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(themes.theme.windowBackground.color)
         .overlay(Divider(), alignment: .bottom)
     }
 
@@ -35,7 +36,7 @@ struct AddressBar: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .regular))
-                .foregroundColor(enabled ? .primary : Color(white: 0.62))
+                .foregroundColor(enabled ? themes.theme.text.color : themes.theme.secondaryText.color.opacity(0.55))
                 .frame(width: 32, height: 26)
                 .contentShape(Rectangle())
         }
@@ -57,7 +58,7 @@ struct AddressBar: View {
             }
         }
         .frame(height: 22)
-        .background(Color.white)
+        .background(themes.theme.contentBackground.color)
         .overlay(
             RoundedRectangle(cornerRadius: 1)
                 .stroke(Color.gray.opacity(0.5), lineWidth: 0.5)
@@ -72,7 +73,7 @@ struct AddressBar: View {
         HStack(spacing: 0) {
             Image(systemName: "desktopcomputer")
                 .font(.system(size: 12))
-                .foregroundColor(Color(red: 0.0, green: 0.47, blue: 0.84))
+                .foregroundColor(themes.theme.accent.color)
                 .padding(.leading, 6)
                 .padding(.trailing, 4)
 
@@ -82,7 +83,7 @@ struct AddressBar: View {
                 } label: {
                     Text(comp.name)
                         .font(.system(size: 12))
-                        .foregroundColor(.primary)
+                        .foregroundColor(themes.theme.text.color)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
                         .contentShape(Rectangle())
@@ -135,7 +136,7 @@ struct AddressBar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 13))
-                        .foregroundColor(clearHover ? Color(white: 0.25) : Color(white: 0.5))
+                        .foregroundColor(clearHover ? themes.theme.text.color : themes.theme.secondaryText.color)
                         .frame(width: 14, height: 14)
                         .contentShape(Rectangle())
                 }
@@ -146,10 +147,10 @@ struct AddressBar: View {
         }
         .padding(.horizontal, 6)
         .frame(width: 220, height: 22)
-        .background(Color.white)
+        .background(themes.theme.contentBackground.color)
         .overlay(
             RoundedRectangle(cornerRadius: 1)
-                .stroke(nav.isSearching ? Color(red: 0.0, green: 0.47, blue: 0.84).opacity(0.6) : Color.gray.opacity(0.5),
+                .stroke(nav.isSearching ? themes.theme.accent.color.opacity(0.6) : Color.gray.opacity(0.5),
                         lineWidth: nav.isSearching ? 1 : 0.5)
         )
     }

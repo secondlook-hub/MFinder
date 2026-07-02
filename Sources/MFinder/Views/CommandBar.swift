@@ -6,6 +6,7 @@ import AppKit
 struct CommandBar: View {
     @EnvironmentObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
+    @ObservedObject private var themes = ThemeService.shared
     @State private var showPreview = false
 
     var body: some View {
@@ -53,7 +54,7 @@ struct CommandBar: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 36)
-        .background(Color(red: 0.96, green: 0.96, blue: 0.96))
+        .background(themes.theme.barBackground.blended(toward: themes.theme.contentBackground, fraction: 0.4).color)
         .overlay(Divider(), alignment: .bottom)
     }
 
@@ -77,7 +78,7 @@ struct CommandBar: View {
                     .font(.system(size: 12))
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(Color(white: 0.4))
+                    .foregroundColor(themes.theme.secondaryText.color)
             }
             .padding(.horizontal, 10)
             .frame(height: 28)
@@ -129,7 +130,7 @@ struct CommandBar: View {
                     .font(.system(size: 12))
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(Color(white: 0.4))
+                    .foregroundColor(themes.theme.secondaryText.color)
             }
             .padding(.horizontal, 8)
             .frame(height: 28)
@@ -162,7 +163,7 @@ struct CommandBar: View {
                     .font(.system(size: 12))
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(Color(white: 0.4))
+                    .foregroundColor(themes.theme.secondaryText.color)
             }
             .padding(.horizontal, 8)
             .frame(height: 28)
@@ -281,7 +282,7 @@ struct CommandBar: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13))
-                .foregroundColor(disabled ? Color(white: 0.65) : .primary)
+                .foregroundColor(disabled ? themes.theme.secondaryText.color.opacity(0.55) : themes.theme.text.color)
                 .frame(width: 30, height: 28)
                 .contentShape(Rectangle())
         }

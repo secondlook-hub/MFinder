@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TabBar: View {
     @EnvironmentObject var tabs: TabsState
+    @ObservedObject private var themes = ThemeService.shared
 
     var body: some View {
         HStack(spacing: 0) {
@@ -19,32 +20,35 @@ struct TabBar: View {
                             onNewTab:       { tabs.newTab() }
                         )
                     }
+
+                    // Sits inside the scroll content so it hugs the last tab
+                    // (browser style) instead of being pinned to the far right.
+                    Button {
+                        tabs.newTab()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(themes.theme.secondaryText.color)
+                            .frame(width: 28, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("새 탭 (⌘T)")
                 }
             }
             .layoutPriority(1)
 
-            Button {
-                tabs.newTab()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(white: 0.3))
-                    .frame(width: 28, height: 30)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("새 탭 (⌘T)")
-
             Spacer(minLength: 0)
         }
         .frame(height: 30)
-        .background(Color(red: 0.93, green: 0.93, blue: 0.93))
+        .background(themes.theme.barBackground.color)
         .overlay(Divider(), alignment: .bottom)
     }
 }
 
 struct TabCell: View {
     @ObservedObject var nav: NavigationState
+    @ObservedObject private var themes = ThemeService.shared
     let isActive: Bool
     let canClose: Bool
     let onSelect: () -> Void
@@ -69,7 +73,7 @@ struct TabCell: View {
 
             Text(displayName)
                 .font(.system(size: 12))
-                .foregroundColor(.black)
+                .foregroundColor(themes.theme.text.color)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -79,7 +83,7 @@ struct TabCell: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(Color(white: 0.3))
+                        .foregroundColor(themes.theme.secondaryText.color)
                         .frame(width: 14, height: 14)
                         .background(hovering ? Color.gray.opacity(0.25) : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 2))
@@ -94,8 +98,8 @@ struct TabCell: View {
         .frame(minWidth: 100, maxWidth: 220)
         .background(
             isActive
-                ? Color.white
-                : (hovering ? Color(red: 0.97, green: 0.97, blue: 0.97) : Color.clear)
+                ? themes.theme.contentBackground.color
+                : (hovering ? themes.theme.barBackground.blended(toward: themes.theme.contentBackground, fraction: 0.5).color : Color.clear)
         )
         .overlay(
             // Right divider
@@ -108,7 +112,7 @@ struct TabCell: View {
         .overlay(alignment: .bottom) {
             if isActive {
                 Rectangle()
-                    .fill(Color(red: 0.0, green: 0.47, blue: 0.84))
+                    .fill(themes.theme.accent.color)
                     .frame(height: 2)
             }
         }

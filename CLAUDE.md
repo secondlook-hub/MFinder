@@ -77,6 +77,15 @@ Sources/MFinder/
 │   ├── FileSystemService.swift   list/quickAccessLocations/thisPCLocations/
 │   │                              moveToTrash (AppleScript Finder).
 │   ├── PinnedFoldersService.swift  UserDefaults; @Published pinnedURLs.
+│   ├── ThemeService.swift        @MainActor singleton. Theme (Codable color
+│   │     set + isDark) with 라이트/다크 builtins + custom themes persisted
+│   │     as JSON in UserDefaults. fontSize (10–18, base for file panes;
+│   │     rowHeight/secondary/snippet derive from it). Setting `current`
+│   │     flips NSApp.appearance. AppKit views read ThemeService.shared
+│   │     during cell config; representables observe it so updateNSView
+│   │     reloads on change (FileTableView tracks lastTheme/lastFontSize,
+│   │     sidebar Coordinator tracks syncedTheme/syncedFontSize — sidebar
+│   │     skips restyle while a rename is active).
 │   ├── UpdateChecker.swift       GitHub Releases poll, semver compare.
 │   └── (PreferencesService, SearchSnippetService, QuickLookCoordinator)
 └── Views/
@@ -102,7 +111,13 @@ Sources/MFinder/
     │                                 subclass with retry + currentEvent-gated
     │                                 resignFirstResponder. **Sidebar does NOT
     │                                 use this** — it failed with SwiftUI
-    │                                 gesture races.
+    │                                 gesture races. Also home of EditFocusWatcher
+    │                                 (ends any inline rename when the app
+    │                                 deactivates or the window loses key; used
+    │                                 by this field + FileTableView + sidebar).
+    ├── SettingsView.swift            Settings scene content (⌘,): font-size
+    │                                 slider, theme picker, custom-theme editor
+    │                                 sheet (ThemeEditorView).
     └── AddressBar / CommandBar / TabBar / StatusBar / ClipboardStackView
 ```
 
@@ -164,4 +179,5 @@ Wrap the body in `MainActor.assumeIsolated { ... }`. Used by the Dock menu actio
 - v1.10 — Sidebar tree right-click → 속성 dialog (만든/수정 날짜 + async folder size via background enumerator).
 - v1.11 — Cross-instance unified clipboard stack (system pasteboard is source of truth, encoded with custom `com.secondlook.MFinder.clipboard-stack` type carrying cut/copy flags and ordering) + 새로 만들기 submenu added to file-table per-file menu, file-list per-item menu, and sidebar folder right-click menu.
 - v1.12 — "서버에 연결…" via `NetFSMountURLAsync` (Cmd+K + 이동 메뉴 + 네트워크 섹션 우클릭). Custom `ServerConnectDialog` (NSPanel) with URL field, recent-server list, status line. `NetworkConnectService` persists recent servers + resolves mount points via `URLResourceKey.volumeURLForRemountingKey`. `SidebarItem` gained `.server(URL)` and `.connectAction` cases; 네트워크 section now lists recents + currently-mounted remote volumes + a "서버에 연결…" action row. Right-click on a server row → 연결 / 연결 끊기 / 주소 복사 / 목록에서 제거. Package.swift links `NetFS.framework`.
+- v1.14 — Themes + font size via 설정 (⌘,): ThemeService/Theme with 라이트/다크 builtins, custom theme editor (name + 7 color wells + isDark base) persisted to UserDefaults; hardcoded chrome colors swept to theme refs; NSApp.appearance follows isDark. Font size 10–18pt (보기 메뉴 ⌘=/⌘-/⌘0) drives file table/list/sidebar fonts + row heights; the details table draws its own zebra stripes now (usesAlternatingRowBackgroundColors off — system alternates aren't themable). 탭 + 버튼 moved inside the tab scroll content (hugs last tab). Paste conflicts now prompt 덮어쓰기/건너뛰기/취소 with an apply-to-remaining checkbox (취소 keeps unpasted entries in the stack) — replaces v1.13's silent paste overwrite; DnD overwrite unchanged. Inline rename ends on focus loss (EditFocusWatcher: app deactivate / window loses key) in all three editors.
 - v1.13 — Drag-and-drop overwrite semantics unified across file table, sidebar tree, and clipboard paste: a same-named item at the destination is removed first (overwrite); dropping/pasting back into an item's own folder duplicates on copy and is a no-op on move/cut (never overwrites self). Drag start cancels the click-and-pause rename timer (`cancelPendingRename`) in both the file table and sidebar so it can't open a stray edit field mid-drag. Explorer-style spring-loaded auto-expand in the sidebar (`SidebarNSOutlineView.draggingUpdated`): we override AppKit's instant spring-load and only expand a hovered collapsed folder after a 1.2s dwell timer, re-collapsing anything AppKit popped early; `springAuthorized` set tracks folders allowed to stay open for the drag.

@@ -37,6 +37,17 @@ struct MFinderApp: App {
                     NotificationCenter.default.post(name: .mfinderPrevTab, object: nil)
                 }.keyboardShortcut("[", modifiers: [.command, .shift])
             }
+            CommandMenu("보기") {
+                Button("글자 크게") {
+                    ThemeService.shared.increaseFontSize()
+                }.keyboardShortcut("=", modifiers: .command)
+                Button("글자 작게") {
+                    ThemeService.shared.decreaseFontSize()
+                }.keyboardShortcut("-", modifiers: .command)
+                Button("글자 기본 크기") {
+                    ThemeService.shared.resetFontSize()
+                }.keyboardShortcut("0", modifiers: .command)
+            }
             CommandMenu("이동") {
                 Button("뒤로") {
                     NotificationCenter.default.post(name: .mfinderGoBack, object: nil)
@@ -57,6 +68,11 @@ struct MFinderApp: App {
                     Task { await updateChecker.checkForUpdates(manual: true) }
                 }
             }
+        }
+
+        // App menu → 설정… (⌘,): font size + theme management.
+        Settings {
+            SettingsView()
         }
     }
 }

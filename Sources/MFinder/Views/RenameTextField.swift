@@ -141,6 +141,41 @@ struct RenameTextField: NSViewRepresentable {
     }
 }
 
+/// Ends an inline rename when keyboard focus leaves the app or the host
+/// window entirely. Clicking elsewhere inside the window already tears the
+/// field editor down through normal responder-chain resignation — app
+/// deactivation (Cmd+Tab, clicking another app) and the window losing key
+/// status are the two paths AppKit leaves the editor alive for, which used
+/// to strand rows in edit mode.
+@MainActor
+final class EditFocusWatcher {
+    private var tokens: [NSObjectProtocol] = []
+
+    func begin(window: NSWindow?, onFocusLoss: @escaping @MainActor () -> Void) {
+        end()
+        let nc = NotificationCenter.default
+        tokens.append(nc.addObserver(forName: NSApplication.willResignActiveNotification,
+                                     object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { onFocusLoss() }
+        })
+        if let window {
+            tokens.append(nc.addObserver(forName: NSWindow.didResignKeyNotification,
+                                         object: window, queue: .main) { _ in
+                MainActor.assumeIsolated { onFocusLoss() }
+            })
+        }
+    }
+
+    func end() {
+        for t in tokens { NotificationCenter.default.removeObserver(t) }
+        tokens.removeAll()
+    }
+
+    deinit {
+        for t in tokens { NotificationCenter.default.removeObserver(t) }
+    }
+}
+
 /// NSTextField subclass that reliably seizes first responder once it's been
 /// added to a window, and refuses to give it up if no user event is driving
 /// the resign (which catches AppKit's deferred focus restoration after a
@@ -151,6 +186,7 @@ struct RenameTextField: NSViewRepresentable {
 final class FocusSeizingTextField: NSTextField {
     var desiredInitialSelection: NSRange?
     private var seized = false
+    private let focusWatcher = EditFocusWatcher()
     /// True between focus claim and a short grace window; used as a fallback
     /// guard so that even an "I don't know what fired this" resign attempt
     /// during the brief setup phase doesn't take the editor down before the
@@ -159,13 +195,28 @@ final class FocusSeizingTextField: NSTextField {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard !seized, window != nil else { return }
+        guard window != nil else {
+            focusWatcher.end()
+            return
+        }
+        focusWatcher.begin(window: window) { [weak self] in
+            self?.dismissForFocusLoss()
+        }
+        guard !seized else { return }
         seized = true
         setupWindowOpen = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.setupWindowOpen = false
         }
         attemptFocus(remaining: 6, delay: 0)
+    }
+
+    /// Focus moved to another window/app — end the edit session through the
+    /// normal delegate path (commit if the user typed, cancel otherwise).
+    private func dismissForFocusLoss() {
+        guard currentEditor() != nil else { return }
+        releaseResignLock()
+        window?.makeFirstResponder(nil)
     }
 
     func releaseResignLock() {

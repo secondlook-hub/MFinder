@@ -52,10 +52,11 @@ enum SidebarSection: String, Hashable {
         }
     }
 
+    @MainActor
     var symbolColor: NSColor {
         switch self {
         case .favorites: return NSColor.systemYellow
-        case .thisPC:    return NSColor(red: 0.0, green: 0.47, blue: 0.84, alpha: 1.0)
+        case .thisPC:    return ThemeService.shared.theme.accent.nsColor
         case .network:   return .gray
         }
     }
@@ -72,6 +73,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
     @ObservedObject var tree: FolderTreeStore
     @ObservedObject var clipboard: ClipboardService = .shared
     @ObservedObject var pinned: PinnedFoldersService = .shared
+    @ObservedObject var themes: ThemeService = .shared
 
     func makeCoordinator() -> Coordinator { Coordinator(nav: nav, tree: tree) }
 
@@ -82,7 +84,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         scrollView.autohidesScrollers = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = .white
+        scrollView.backgroundColor = ThemeService.shared.theme.contentBackground.nsColor
 
         let outline = SidebarNSOutlineView()
         outline.coordinator = context.coordinator
@@ -90,14 +92,14 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         outline.style = .plain
         outline.indentationPerLevel = 14
-        outline.rowHeight = 22
+        outline.rowHeight = ThemeService.shared.rowHeight
         outline.headerView = nil
         outline.usesAlternatingRowBackgroundColors = false
         outline.gridStyleMask = []
         outline.intercellSpacing = NSSize(width: 0, height: 0)
         outline.allowsMultipleSelection = true
         outline.allowsEmptySelection = true
-        outline.backgroundColor = .white
+        outline.backgroundColor = ThemeService.shared.theme.contentBackground.nsColor
         outline.floatsGroupRows = false
         outline.selectionHighlightStyle = .regular
         outline.autoresizesOutlineColumn = true
@@ -153,6 +155,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         private var syncedChildrenCache: [URL: [URL]] = [:]
         private var syncedPinnedURLs: [URL] = []
         private var syncedRenamingURL: URL?
+        private var syncedTheme: Theme?
+        private var syncedFontSize: CGFloat = -1
         private var suppressSelectionNotification = false
         private var volumeMountToken: NSObjectProtocol?
         private var volumeUnmountToken: NSObjectProtocol?
@@ -168,6 +172,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         // Active rename target so controlTextDidEndEditing knows which item
         // was being edited even after the row scrolls or refreshes.
         var activeRenameURL: URL?
+        let renameFocusWatcher = EditFocusWatcher()
 
         init(nav: NavigationState, tree: FolderTreeStore) {
             self.nav = nav
@@ -373,8 +378,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             icon.contentTintColor = id.symbolColor
             icon.translatesAutoresizingMaskIntoConstraints = false
             let label = NSTextField(labelWithString: id.rawValue)
-            label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-            label.textColor = .black
+            label.font = NSFont.systemFont(ofSize: ThemeService.shared.fontSize, weight: .medium)
+            label.textColor = ThemeService.shared.theme.text.nsColor
             label.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(icon)
             cell.addSubview(label)
@@ -415,8 +420,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             icon.contentTintColor = mounted ? .systemGreen : .secondaryLabelColor
             icon.translatesAutoresizingMaskIntoConstraints = false
             let label = NSTextField(labelWithString: serverDisplayName(server))
-            label.font = .systemFont(ofSize: 12)
-            label.textColor = .black
+            label.font = .systemFont(ofSize: ThemeService.shared.fontSize)
+            label.textColor = ThemeService.shared.theme.text.nsColor
             label.lineBreakMode = .byTruncatingTail
             label.translatesAutoresizingMaskIntoConstraints = false
             label.toolTip = server.absoluteString
@@ -440,11 +445,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             let cell = NSTableCellView()
             let icon = NSImageView()
             icon.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
-            icon.contentTintColor = .systemBlue
+            icon.contentTintColor = ThemeService.shared.theme.accent.nsColor
             icon.translatesAutoresizingMaskIntoConstraints = false
             let label = NSTextField(labelWithString: "서버에 연결…")
-            label.font = .systemFont(ofSize: 12)
-            label.textColor = .systemBlue
+            label.font = .systemFont(ofSize: ThemeService.shared.fontSize)
+            label.textColor = ThemeService.shared.theme.accent.nsColor
             label.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(icon)
             cell.addSubview(label)
@@ -488,7 +493,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             label.isSelectable = false
             label.isBezeled = false
             label.drawsBackground = false
-            label.font = NSFont.systemFont(ofSize: 12)
+            label.font = NSFont.systemFont(ofSize: ThemeService.shared.fontSize)
+            label.textColor = ThemeService.shared.theme.text.nsColor
             label.lineBreakMode = .byTruncatingTail
             label.usesSingleLineMode = true
             label.delegate = self
@@ -588,6 +594,19 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             // destroy the active field editor and we'd lose the user's edit
             // (this is the exact problem the SwiftUI version had).
             let isRenameActive = nav.renamingURL != nil
+
+            // Theme / font sync — cells restyle on their next build, so a
+            // change just needs backgrounds + row height + a reload.
+            let theming = ThemeService.shared
+            if !isRenameActive,
+               syncedTheme != theming.theme || syncedFontSize != theming.fontSize {
+                syncedTheme = theming.theme
+                syncedFontSize = theming.fontSize
+                ov.backgroundColor = theming.theme.contentBackground.nsColor
+                ov.enclosingScrollView?.backgroundColor = theming.theme.contentBackground.nsColor
+                ov.rowHeight = theming.rowHeight
+                ov.reloadData()
+            }
 
             let childrenChanged = syncedChildrenCache != tree.childrenCache
             let expansionChanged = syncedExpanded != tree.expandedURLs
@@ -721,6 +740,12 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             tf.stringValue = url.lastPathComponent
             activeRenameURL = url
             ov.editColumn(0, row: row, with: nil, select: false)
+            // End the edit if focus leaves the app/window — forcing the
+            // outline back to first responder runs the commit/cancel path.
+            renameFocusWatcher.begin(window: ov.window) { [weak ov] in
+                guard let ov, ov.window?.firstResponder is NSText else { return }
+                ov.window?.makeFirstResponder(ov)
+            }
             // Place caret at end so the original name stays visible (Finder
             // selects all; we prefer Windows-style caret-at-end for folders).
             if let editor = tf.window?.fieldEditor(true, for: tf) as? NSTextView {
@@ -731,6 +756,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField,
                   let ov = outlineView else { return }
+            renameFocusWatcher.end()
             let row = ov.row(for: tf)
             defer {
                 tf.isEditable = false
@@ -1449,7 +1475,7 @@ final class SidebarRowView: NSTableRowView {
 
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
-        NSColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0).setFill()
+        ThemeService.shared.theme.selection.nsColor.setFill()
         bounds.fill()
     }
 }

@@ -10,6 +10,7 @@ import AppKit
 struct SidebarView: View {
     @EnvironmentObject var nav: NavigationState
     @EnvironmentObject var tree: FolderTreeStore
+    @ObservedObject private var themes = ThemeService.shared
 
     /// Operative URLs for sidebar keyboard shortcuts — the multi-selection
     /// if non-empty, otherwise the currently-navigated folder. This is how
@@ -20,7 +21,7 @@ struct SidebarView: View {
 
     var body: some View {
         SidebarOutlineRepresentable(nav: nav, tree: tree)
-            .background(Color.white)
+            .background(themes.theme.contentBackground.color)
             .onReceive(NotificationCenter.default.publisher(for: .mfinderRenameSelected)) { _ in
                 guard AppFocus.area == .sidebar else { return }
                 guard nav.renamingURL == nil else { return }
