@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>ko</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>ko</string>
+    </array>
     <key>CFBundleName</key>
     <string>MFinder</string>
     <key>CFBundleDisplayName</key>
@@ -15,9 +21,9 @@
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleVersion</key>
-    <string>1.15</string>
+    <string>1.16</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.15</string>
+    <string>1.16</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundlePackageType</key>

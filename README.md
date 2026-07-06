@@ -34,7 +34,8 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Themes** — 설정 (⌘,) offers built-in 라이트/다크 themes plus a custom theme editor: pick window/bar/content backgrounds, selection, accent, and text colors, name the theme, and save it. Custom themes persist across launches
 - **Font Size** — Adjustable base font size (10–18pt) for the details table, list/icon modes, and sidebar tree via 설정 slider or 보기 → 글자 크게/작게/기본 (⌘= / ⌘- / ⌘0); row heights follow
 - **Overwrite Prompt** — Pasting or dropping over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. Cancelling a paste keeps the unpasted entries in the clipboard stack
-- **Korean UI** — Native Korean menu labels throughout
+- **Mouse Back/Forward Buttons** — Side buttons on mice like the Logitech MX Master navigate folder history, browser-style
+- **Korean UI** — Fully Korean menu bar: the app declares a Korean-only localization, so system-provided menus (파일/편집/보기/윈도우/도움말, MFinder에 관하여, 종료 등) render in Korean alongside the app's own labels
 
 ## Install
 
@@ -58,10 +59,12 @@ Requires **Swift 5.9** and **macOS 13.0 Ventura** or later.
 | Cmd+N | New Window (independent instance) |
 | Cmd+T | New Tab |
 | Cmd+W | Close Tab |
+| Shift+Cmd+W | Close Window |
 | Cmd+Shift+] | Next Tab |
 | Cmd+Shift+[ | Previous Tab |
 | Cmd+[ | Back |
 | Cmd+] | Forward |
+| Mouse button 4 / 5 | Back / Forward |
 | Cmd+Up | Up one folder |
 | Space | Quick Look the selection |
 | F2 | Rename selected |

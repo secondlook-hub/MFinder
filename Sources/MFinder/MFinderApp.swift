@@ -22,6 +22,19 @@ struct MFinderApp: App {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
                 }.keyboardShortcut("t", modifiers: .command)
             }
+            // Replace the system Close (⌘W): the menu bar resolves key
+            // equivalents left-to-right, so the File menu's Close used to
+            // swallow ⌘W before the 탭 menu's 탭 닫기 ever saw it — closing
+            // the window (and quitting, via terminate-after-last-window)
+            // instead of the tab.
+            CommandGroup(replacing: .saveItem) {
+                Button("탭 닫기") {
+                    NotificationCenter.default.post(name: .mfinderCloseTab, object: nil)
+                }.keyboardShortcut("w", modifiers: .command)
+                Button("창 닫기") {
+                    NSApp.keyWindow?.performClose(nil)
+                }.keyboardShortcut("w", modifiers: [.command, .shift])
+            }
             CommandMenu("탭") {
                 Button("새 탭") {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
@@ -37,7 +50,12 @@ struct MFinderApp: App {
                     NotificationCenter.default.post(name: .mfinderPrevTab, object: nil)
                 }.keyboardShortcut("[", modifiers: [.command, .shift])
             }
-            CommandMenu("보기") {
+            // Insert into the system View menu (AppKit already owns one for
+            // "전체 화면 시작") instead of a separate CommandMenu, so there is
+            // a single 보기 menu rather than a custom Korean one next to the
+            // English system one.
+            CommandGroup(after: .toolbar) {
+                Divider()
                 Button("글자 크게") {
                     ThemeService.shared.increaseFontSize()
                 }.keyboardShortcut("=", modifiers: .command)
@@ -98,6 +116,7 @@ extension Notification.Name {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyMonitor: Any?
+    private var mouseMonitor: Any?
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
@@ -107,6 +126,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         installKeyMonitor()
+        installMouseMonitor()
+    }
+
+    /// Mouse side buttons (e.g. Logitech MX Master back/forward) navigate
+    /// history, browser-style. AppKit reports them as "other" mouse buttons:
+    /// buttonNumber 3 = back, 4 = forward.
+    private func installMouseMonitor() {
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseUp) { event in
+            switch event.buttonNumber {
+            case 3:
+                NotificationCenter.default.post(name: .mfinderGoBack, object: nil)
+                return nil
+            case 4:
+                NotificationCenter.default.post(name: .mfinderGoForward, object: nil)
+                return nil
+            default:
+                return event
+            }
+        }
     }
 
     /// Adds custom items to the Dock icon's right-click menu. Custom items
@@ -130,7 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        if let m = keyMonitor { NSEvent.removeMonitor(m) }
+        if let m = keyMonitor   { NSEvent.removeMonitor(m) }
+        if let m = mouseMonitor { NSEvent.removeMonitor(m) }
     }
 
     /// Intercepts top-level key events.

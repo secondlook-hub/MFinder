@@ -796,15 +796,33 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             }
         }
 
+        /// Pressing Esc cancels the edit. Without this, the field editor
+        /// aborts silently — controlTextDidEndEditing never fires, so the
+        /// bezel/background styling and nav.renamingURL stick around, and the
+        /// rename-active guard in applyState() then blocks every sidebar
+        /// reload (including theme changes) until some later rename commits.
+        /// Routing Esc through makeFirstResponder(outline) ends the editing
+        /// session properly, running the normal cleanup path.
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                if let tf = control as? NSTextField, let url = activeRenameURL {
+                    tf.stringValue = url.lastPathComponent
+                }
+                outlineView?.window?.makeFirstResponder(outlineView)
+                return true
+            }
+            return false
+        }
+
         // MARK: - Click-after-pause rename (Finder/Explorer parity)
 
-        func handleMouseDown(event: NSEvent) {
+        func handleMouseDown(event: NSEvent, wasAlreadySelected: Bool) {
             guard let ov = outlineView else { return }
             let point = ov.convert(event.locationInWindow, from: nil)
             let row = ov.row(at: point)
             let isPlain = event.clickCount == 1 &&
                 event.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty
-            let onSelectedRow = row >= 0 && ov.selectedRow == row
+            let onSelectedRow = wasAlreadySelected && row >= 0 && ov.selectedRow == row
             let renameable: Bool = {
                 guard let node = ov.item(atRow: row) as? SidebarItem else { return false }
                 switch node {
@@ -1382,10 +1400,47 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
 // MARK: - NSOutlineView subclass with custom mouseDown + F2 hooks
 
-final class SidebarNSOutlineView: NSOutlineView {
+final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
     weak var coordinator: SidebarOutlineRepresentable.Coordinator?
 
     override var acceptsFirstResponder: Bool { true }
+
+    // The standard Edit menu dispatches cut:/copy:/paste: through the
+    // responder chain. Without these, Edit > 복사 stays disabled whenever the
+    // sidebar tree has keyboard focus (the ⌘C key itself is intercepted by
+    // AppDelegate's monitor, but a menu click never was).
+    private var treeActionURLs: [URL] {
+        guard let nav = coordinator?.nav else { return [] }
+        return nav.sidebarSelectionURLs.isEmpty ? [nav.currentURL] : nav.sidebarSelectionURLs
+    }
+
+    @objc func copy(_ sender: Any?) {
+        let urls = treeActionURLs
+        guard !urls.isEmpty else { return }
+        ClipboardService.shared.copy(urls)
+    }
+
+    @objc func cut(_ sender: Any?) {
+        let urls = treeActionURLs
+        guard !urls.isEmpty else { return }
+        ClipboardService.shared.cut(urls)
+    }
+
+    @objc func paste(_ sender: Any?) {
+        guard let c = coordinator else { return }
+        pasteIntoFolderShared(c.nav.currentURL, nav: c.nav, tree: c.tree)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        switch menuItem.action {
+        case #selector(copy(_:)), #selector(cut(_:)):
+            return !treeActionURLs.isEmpty
+        case #selector(paste(_:)):
+            return ClipboardService.shared.hasContent
+        default:
+            return true
+        }
+    }
 
     // MARK: - Spring-loaded auto-expand (delayed, Explorer-style)
     //
@@ -1463,10 +1518,20 @@ final class SidebarNSOutlineView: NSOutlineView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        // Let AppKit handle the actual selection first so `selectedRow`
+        AppFocus.area = .sidebar
+        // Capture the selection state BEFORE AppKit processes the click:
+        // the click-and-pause rename must only arm on a row that was
+        // already selected before this click (Finder/Explorer parity).
+        // Checking after super.mouseDown made a fresh first click look
+        // "already selected", so merely resting the pointer on a
+        // newly-clicked folder started a rename.
+        let point = convert(event.locationInWindow, from: nil)
+        let clicked = row(at: point)
+        let wasAlreadySelected = clicked >= 0 && selectedRowIndexes == IndexSet(integer: clicked)
+        // Let AppKit handle the actual selection so `selectedRow`
         // reflects the click before our handler runs.
         super.mouseDown(with: event)
-        coordinator?.handleMouseDown(event: event)
+        coordinator?.handleMouseDown(event: event, wasAlreadySelected: wasAlreadySelected)
     }
 
     override func keyDown(with event: NSEvent) {

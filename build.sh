@@ -31,6 +31,12 @@ if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
     cp "$ROOT/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
 
+# Korean localization marker: the bundle declares only `ko`, so AppKit /
+# SwiftUI load their framework strings (File/Edit/Window/Help, About, Quit,
+# Close, Enter Full Screen, …) in Korean regardless of system language,
+# matching the app's Korean-only UI.
+mkdir -p "$APP_BUNDLE/Contents/Resources/ko.lproj"
+
 # PkgInfo
 printf "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 

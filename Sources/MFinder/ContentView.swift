@@ -38,6 +38,15 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .mfinderPrevTab)) { _ in
             tabs.prevTab()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderGoBack)) { _ in
+            tabs.active.goBack()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderGoForward)) { _ in
+            tabs.active.goForward()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderGoUp)) { _ in
+            tabs.active.goUp()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderConnectToServer)) { _ in
             ServerConnectDialog.shared.present { mountedURL in
                 tabs.newTab(at: mountedURL)

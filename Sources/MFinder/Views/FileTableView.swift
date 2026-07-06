@@ -179,6 +179,7 @@ struct FileTableView: NSViewRepresentable {
                     let isTextEditing = (tableView.window?.firstResponder as? NSText) != nil
                     if !isTextEditing, tableView.window?.firstResponder !== tableView {
                         tableView.window?.makeFirstResponder(tableView)
+                        AppFocus.area = .fileList
                     }
                 }
             }
@@ -445,6 +446,7 @@ final class FileNSTableView: NSTableView, NSMenuItemValidation {
     }
 
     override func mouseDown(with event: NSEvent) {
+        AppFocus.area = .fileList
         // Cancel any pending rename when a new click occurs (e.g. double-click).
         renameTimer?.invalidate()
         renameTimer = nil
@@ -884,7 +886,14 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         if parent.nav.selectedItems != sel {
             parent.nav.selectedItems = sel
         }
-        AppFocus.area = .fileList
+        // Claim keyboard focus only when the table actually has it. This
+        // notification also fires for programmatic selection resets — e.g.
+        // the reload right after the user clicks a folder in the sidebar —
+        // and unconditionally flipping to .fileList there silently rerouted
+        // the sidebar's ⌘C/⌘X/⌘V away from the tree selection.
+        if tv.window?.firstResponder === tv {
+            AppFocus.area = .fileList
+        }
     }
 
     /// Returns our custom row view so selected rows render in the theme's
