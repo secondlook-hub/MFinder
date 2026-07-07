@@ -18,6 +18,9 @@ enum SidebarItem: Hashable {
     case server(URL)
     /// "서버에 연결…" action row at the bottom of the 네트워크 section.
     case connectAction
+    /// AirDrop row at the top of 즐겨찾기 — click sends the current file-list
+    /// selection (or prompts for files); dropping files onto it AirDrops them.
+    case airdrop
 
     /// Local filesystem URL the row represents, when it has one. Server and
     /// action rows return nil here — callers that care about a server's
@@ -29,7 +32,7 @@ enum SidebarItem: Hashable {
         switch self {
         case .favoriteRoot(let qa), .pcRoot(let qa): return qa.url
         case .folder(let url): return url
-        case .section, .server, .connectAction: return nil
+        case .section, .server, .connectAction, .airdrop: return nil
         }
     }
 
@@ -203,7 +206,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 switch id {
                 case .favorites:
                     _ = PinnedFoldersService.shared.pinnedURLs
-                    return FileSystemService.shared.quickAccessLocations().map { .favoriteRoot($0) }
+                    return [.airdrop]
+                        + FileSystemService.shared.quickAccessLocations().map { .favoriteRoot($0) }
                 case .thisPC:
                     return FileSystemService.shared.thisPCLocations().map { .pcRoot($0) }
                 case .network:
@@ -228,7 +232,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             case .folder(let url):
                 let kids = tree.children(of: url) ?? []
                 return kids.map { .folder($0) }
-            case .server, .connectAction:
+            case .server, .connectAction, .airdrop:
                 return []
             }
         }
@@ -259,7 +263,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     return !cached.isEmpty
                 }
                 return true
-            case .server, .connectAction:
+            case .server, .connectAction, .airdrop:
                 return false
             }
         }
@@ -281,6 +285,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return makeServerCell(server: server)
             case .connectAction:
                 return makeConnectActionCell()
+            case .airdrop:
+                return makeAirDropCell()
             }
         }
 
@@ -350,9 +356,43 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
                 // Don't leave the action row highlighted.
                 ov.deselectAll(nil)
+            case .airdrop:
+                ov.deselectAll(nil)
+                sendCurrentSelectionViaAirDrop()
             case .section:
                 break
             }
+        }
+
+        /// AirDrop the file list's current selection; with nothing selected,
+        /// let the user pick files first (Finder opens its AirDrop browser
+        /// here, which has no public API — a picker is the closest match).
+        private func sendCurrentSelectionViaAirDrop() {
+            let selected = nav.filteredItems.filter { nav.selectedItems.contains($0.url) }.map(\.url)
+            if !selected.isEmpty {
+                airDropSend(selected)
+                return
+            }
+            let panel = NSOpenPanel()
+            panel.title = "AirDrop으로 보낼 파일 선택"
+            panel.prompt = "보내기"
+            panel.canChooseFiles = true
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = true
+            panel.directoryURL = nav.currentURL
+            if panel.runModal() == .OK, !panel.urls.isEmpty {
+                airDropSend(panel.urls)
+            }
+        }
+
+        private func airDropSend(_ urls: [URL]) {
+            guard !urls.isEmpty else { return }
+            guard let service = NSSharingService(named: .sendViaAirDrop),
+                  service.canPerform(withItems: urls) else {
+                presentAlert("AirDrop 사용 불가", "이 항목을 AirDrop으로 보낼 수 없습니다.")
+                return
+            }
+            service.perform(withItems: urls)
         }
 
         func outlineViewItemDidExpand(_ notification: Notification) {
@@ -441,6 +481,34 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             return cell
         }
 
+        private func makeAirDropCell() -> NSView {
+            let cell = NSTableCellView()
+            let icon = NSImageView()
+            icon.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right",
+                                 accessibilityDescription: "AirDrop")
+            icon.contentTintColor = ThemeService.shared.theme.accent.nsColor
+            icon.translatesAutoresizingMaskIntoConstraints = false
+            let label = NSTextField(labelWithString: "AirDrop")
+            label.font = .systemFont(ofSize: ThemeService.shared.fontSize)
+            label.textColor = ThemeService.shared.theme.text.nsColor
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.toolTip = "클릭: 선택한 파일 보내기 · 파일을 끌어다 놓아도 보낼 수 있습니다"
+            cell.addSubview(icon)
+            cell.addSubview(label)
+            cell.imageView = icon
+            cell.textField = label
+            NSLayoutConstraint.activate([
+                icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                icon.widthAnchor.constraint(equalToConstant: 16),
+                icon.heightAnchor.constraint(equalToConstant: 14),
+                label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+            return cell
+        }
+
         private func makeConnectActionCell() -> NSView {
             let cell = NSTableCellView()
             let icon = NSImageView()
@@ -509,16 +577,50 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             cell.imageView = icon
             cell.textField = label
 
-            NSLayoutConstraint.activate([
+            // Mounted, ejectable volumes (USB, DMG, external disks) get an
+            // inline ⏏ button on the row, Finder-style.
+            var ejectButton: NSButton?
+            if Self.isEjectableVolume(url) {
+                let btn = EjectVolumeButton()
+                btn.volumeURL = url
+                btn.target = self
+                btn.action = #selector(ejectButtonPressed(_:))
+                btn.isBordered = false
+                btn.imagePosition = .imageOnly
+                btn.image = NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "꺼내기")
+                btn.contentTintColor = ThemeService.shared.theme.secondaryText.nsColor
+                btn.toolTip = "꺼내기"
+                btn.translatesAutoresizingMaskIntoConstraints = false
+                cell.addSubview(btn)
+                ejectButton = btn
+            }
+
+            var constraints = [
                 icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
                 icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 icon.widthAnchor.constraint(equalToConstant: 16),
                 icon.heightAnchor.constraint(equalToConstant: 14),
                 label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
-                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
                 label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
-            ])
+            ]
+            if let btn = ejectButton {
+                constraints += [
+                    label.trailingAnchor.constraint(equalTo: btn.leadingAnchor, constant: -4),
+                    btn.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6),
+                    btn.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                    btn.widthAnchor.constraint(equalToConstant: 18),
+                    btn.heightAnchor.constraint(equalToConstant: 16)
+                ]
+            } else {
+                constraints.append(label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4))
+            }
+            NSLayoutConstraint.activate(constraints)
             return cell
+        }
+
+        @objc private func ejectButtonPressed(_ sender: NSButton) {
+            guard let btn = sender as? EjectVolumeButton, let url = btn.volumeURL else { return }
+            eject(url)
         }
 
         // MARK: - State synchronization
@@ -784,6 +886,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             let dst = parent.appendingPathComponent(newName)
             do {
                 try FileManager.default.moveItem(at: originalURL, to: dst)
+                UndoService.shared.register(.move(pairs: [(from: originalURL, to: dst)]),
+                                            label: "이름 바꾸기")
                 tree.reloadChildren(of: parent)
                 if originalURL.standardizedFileURL == nav.currentURL.standardizedFileURL {
                     nav.navigate(to: dst)
@@ -948,6 +1052,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             case .connectAction:
                 menu.addItem(blockItem("서버에 연결…") {
                     NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
+                })
+            case .airdrop:
+                menu.addItem(blockItem("AirDrop으로 보내기…") { [weak self] in
+                    self?.sendCurrentSelectionViaAirDrop()
                 })
             }
         }
@@ -1301,9 +1409,12 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                          validateDrop info: NSDraggingInfo,
                          proposedItem item: Any?,
                          proposedChildIndex index: Int) -> NSDragOperation {
-            guard let node = item as? SidebarItem, node.folderURL != nil, index == NSOutlineViewDropOnItemIndex else {
+            guard let node = item as? SidebarItem, index == NSOutlineViewDropOnItemIndex else {
                 return []
             }
+            // Dropping onto the AirDrop row sends the files (always a copy).
+            if case .airdrop = node { return .copy }
+            guard node.folderURL != nil else { return [] }
             return NSEvent.modifierFlags.contains(.option) ? .copy : .move
         }
 
@@ -1311,10 +1422,15 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                          acceptDrop info: NSDraggingInfo,
                          item: Any?,
                          childIndex index: Int) -> Bool {
-            guard let node = item as? SidebarItem, let dst = node.folderURL else { return false }
-            let shouldCopy = NSEvent.modifierFlags.contains(.option)
+            guard let node = item as? SidebarItem else { return false }
             let pb = info.draggingPasteboard
             guard let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else { return false }
+            if case .airdrop = node {
+                airDropSend(urls)
+                return true
+            }
+            guard let dst = node.folderURL else { return false }
+            let shouldCopy = NSEvent.modifierFlags.contains(.option)
             // Count overwrite conflicts up front so each dialog can offer a
             // blanket answer for the rest (same UX as clipboard paste).
             var conflictsLeft = urls.filter { src in
@@ -1327,8 +1443,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     && FileManager.default.fileExists(atPath: plainTarget.path)
             }.count
             var blanket: FileConflictChoice?
-            var firstErr: Error?
-            var landed: [URL] = []
+            var ops: [FileOperation] = []
             for src in urls {
                 let stdSrc = src.standardizedFileURL
                 let stdDst = dst.standardizedFileURL
@@ -1352,27 +1467,33 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     }
                     target = plainTarget
                 }
-                do {
-                    if shouldCopy {
-                        try FileManager.default.copyItem(at: src, to: target)
-                    } else {
-                        try FileManager.default.moveItem(at: src, to: target)
-                    }
-                    landed.append(target)
-                } catch {
-                    if firstErr == nil { firstErr = error }
+                ops.append(FileOperation(src: src, dst: target, isMove: !shouldCopy))
+            }
+            guard !ops.isEmpty else { return false }
+
+            // Background copy/move with a progress panel; refresh tree + list
+            // once it lands.
+            let nav = self.nav
+            let tree = self.tree
+            FileOperationService.shared.perform(ops, title: shouldCopy ? "복사 중…" : "이동 중…") { [weak self] done, err in
+                let landed = done.map(\.dst)
+                if shouldCopy {
+                    UndoService.shared.register(.create(urls: landed), label: "복사")
+                } else {
+                    UndoService.shared.register(.move(pairs: done.map { (from: $0.src, to: $0.dst) }),
+                                                label: "이동")
+                }
+                tree.reloadChildren(of: dst)
+                if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
+                    nav.reload(thenSelect: Set(landed))
+                } else {
+                    nav.reload()
+                }
+                if let err, landed.isEmpty {
+                    self?.presentAlert("드롭 실패", err.localizedDescription)
                 }
             }
-            tree.reloadChildren(of: dst)
-            if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
-                nav.reload(thenSelect: Set(landed))
-            } else {
-                nav.reload()
-            }
-            if let err = firstErr, landed.isEmpty {
-                presentAlert("드롭 실패", err.localizedDescription)
-            }
-            return !landed.isEmpty
+            return true
         }
 
         // MARK: - Drag (source)
@@ -1585,4 +1706,10 @@ final class MenuActionTarget: NSObject {
     let action: () -> Void
     init(action: @escaping () -> Void) { self.action = action }
     @objc func invoke(_ sender: Any?) { action() }
+}
+
+/// Inline ⏏ button on mounted-volume rows. Carries its volume URL so the
+/// coordinator's shared action can eject the right disk.
+final class EjectVolumeButton: NSButton {
+    var volumeURL: URL?
 }

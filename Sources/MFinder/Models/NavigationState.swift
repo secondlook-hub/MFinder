@@ -45,6 +45,21 @@ enum SortField: String, CaseIterable {
     case modified = "수정한 날짜"
     case type = "유형"
     case size = "크기"
+    case created = "만든 날짜"
+    case ext = "확장명"
+}
+
+/// Explorer-style grouping for the details view. Groups render as bold
+/// section rows above their items; ordering is fixed per field (dates newest
+/// bucket first, sizes small→large, labels alphabetical).
+enum GroupField: String, CaseIterable {
+    case none = "(없음)"
+    case name = "이름"
+    case modified = "수정한 날짜"
+    case type = "유형"
+    case size = "크기"
+    case created = "만든 날짜"
+    case ext = "확장명"
 }
 
 /// Parsed search query: separates include tokens, exclude (`-foo`) tokens, and
@@ -134,6 +149,9 @@ final class NavigationState: ObservableObject {
     @Published var sortAscending: Bool = true {
         didSet { PreferencesService.shared.sortAscending = sortAscending }
     }
+    @Published var groupField: GroupField = .none {
+        didSet { PreferencesService.shared.groupField = groupField }
+    }
     @Published var showHidden: Bool = false {
         didSet {
             PreferencesService.shared.showHidden = showHidden
@@ -202,6 +220,7 @@ final class NavigationState: ObservableObject {
         self.viewMode      = PreferencesService.shared.viewMode
         self.sortField     = PreferencesService.shared.sortField
         self.sortAscending = PreferencesService.shared.sortAscending
+        self.groupField    = PreferencesService.shared.groupField
 
         // FSEvents watcher — installed after `self` is fully constructed.
         self.fsWatcher = FileSystemWatcher { [weak self] changedPaths in
@@ -436,6 +455,10 @@ final class NavigationState: ObservableObject {
             case .size:
                 cmp = lhs.size < rhs.size ? .orderedAscending
                     : lhs.size > rhs.size ? .orderedDescending : .orderedSame
+            case .created:
+                cmp = lhs.creationDate.compare(rhs.creationDate)
+            case .ext:
+                cmp = lhs.ext.localizedCaseInsensitiveCompare(rhs.ext)
             }
             if cmp == .orderedSame {
                 return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending

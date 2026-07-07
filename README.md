@@ -11,7 +11,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **View Modes** — Details (native NSTableView), List, Small / Medium / Large / Extra-Large Icons, Tiles, Content
 - **NSOutlineView Sidebar** — 즐겨찾기 (favorites with pinning), 내 PC (volumes), 네트워크 sections under a single outline view; inline folder rename via AppKit's `editColumn` field editor
 - **Multi-Select in Tree** — Cmd-click / Shift-click multiple folders in the sidebar to copy, cut, trash, pin, alias, or reveal them all at once. Single-target actions (rename, paste-into, eject) stay scoped to the right-clicked row
-- **Live Volume List** — Mounted DMGs, external drives, and network shares appear in the 내 PC section the moment they mount; right-click → 꺼내기 to unmount
+- **Live Volume List** — Mounted DMGs, external drives, and network shares appear in the 내 PC section the moment they mount, each with an inline ⏏ eject button; right-click → 꺼내기 also works
 - **Inline Rename** — Right-click → "이름 바꾸기", F2, or click-and-pause on an already-selected row. Mouse must stay on the row for the pause-to-rename to activate; cancels if the cursor leaves
 - **Address Bar** — Breadcrumb path navigation, editable URL field, jump to any ancestor
 - **Spotlight Search** — Backed by NSMetadataQuery with token parsing: `-exclude` words, `"quoted phrases"`, content + filename matching. Inline snippet preview in the file list
@@ -28,13 +28,21 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Permission Guidance** — TCC-protected folders (OneDrive / Google Drive / Dropbox under `~/Library/CloudStorage`) trigger a clear dialog with a one-click jump to System Settings → Privacy & Security → Full Disk Access
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
 - **File Properties** — 속성 dialog on file-list items (size, type, dates, permissions) and on sidebar tree folders (만든/수정 날짜 + async-computed total size)
-- **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…") and offers a one-click download when a newer version is available
+- **Auto Update** — Checks GitHub Releases on launch (and on-demand via Help → "업데이트 확인…"); "자동 설치" downloads the DMG, swaps the app bundle, and relaunches in one click — no manual mount-and-copy
 - **Multiple Instances** — Run several independent MFinder processes side by side, each with its own tabs and sidebar tree. The clipboard stack is unified across all running instances. Launch via File → 새 창 (Cmd+N) or Dock icon right-click → 새 창 열기. Copy in one instance, paste in another — the destination instance auto-focuses and scrolls to the newly pasted item.
 - **Connect to Server** — 이동 → "서버에 연결…" (⌘K) or right-click on the 네트워크 sidebar section opens a Finder-style dialog for `smb://`, `afp://`, `ftp://`, `nfs://`, and WebDAV URLs. Mounts via `NetFS.framework` so the system's credentials sheet and Keychain are reused. Recent servers are persisted and listed under the 네트워크 section — right-click → 연결 / 연결 끊기 / 목록에서 제거
-- **Themes** — 설정 (⌘,) offers built-in 라이트/다크 themes plus a custom theme editor: pick window/bar/content backgrounds, selection, accent, and text colors, name the theme, and save it. Custom themes persist across launches
+- **Themes** — 설정 (⌘,) offers built-in 라이트/다크 themes plus a custom theme editor: pick window/bar/content backgrounds, selection, accent, and text colors, name the theme, and save it. Custom themes persist across launches. "시스템 화면 모드에 맞춤" follows the macOS light/dark appearance live
 - **Font Size** — Adjustable base font size (10–18pt) for the details table, list/icon modes, and sidebar tree via 설정 slider or 보기 → 글자 크게/작게/기본 (⌘= / ⌘- / ⌘0); row heights follow
 - **Overwrite Prompt** — Pasting or dropping over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. Cancelling a paste keeps the unpasted entries in the clipboard stack
 - **Mouse Back/Forward Buttons** — Side buttons on mice like the Logitech MX Master navigate folder history, browser-style
+- **Custom Columns** — Right-click the details-view header to show/hide 수정한 날짜 / 유형 / 크기 / 만든 날짜 / 확장명 columns, Explorer-style; every column sorts
+- **Async Copy/Move with Progress** — Paste and drag-drop run in the background with an Explorer-style progress panel (current item, N/M counter, byte-accurate bar, cancel); the UI never freezes on multi-GB copies
+- **Undo / Redo (⌘Z / ⇧⌘Z)** — Reverts paste, drag move/copy, rename (single + batch), 새로 만들기, 바로 가기 만들기, and 휴지통 이동 (restores from the Trash), up to 50 steps
+- **Group By** — 그룹화 기준 in the details view: 이름 / 수정한 날짜(오늘·어제·이번 주…) / 유형 / 크기 buckets / 만든 날짜 / 확장명, with item counts per group header
+- **Preview Pane (⇧⌘P)** — Docked Quick Look preview + key attributes on the right, updating with the selection
+- **Batch Rename** — Multi-select → right-click → 일괄 이름 바꾸기: number sequentially from a base name, or find/replace inside names; one ⌘Z undoes the whole batch
+- **AirDrop** — Sidebar AirDrop row: click to send the current selection (or pick files), or drag files onto it; also in 공유/보내기 context menus
+- **Type-Ahead** — Typing in the details view jumps to the next matching filename
 - **Korean UI** — Fully Korean menu bar: the app declares a Korean-only localization, so system-provided menus (파일/편집/보기/윈도우/도움말, MFinder에 관하여, 종료 등) render in Korean alongside the app's own labels
 
 ## Install

@@ -110,21 +110,25 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
     // MARK: - Paste
 
     /// Drains the stack into `destination`. Each entry is moved (cut) or
-    /// copied based on its `isCut` flag. Returns the URLs that were
-    /// successfully created at the destination.
+    /// copied based on its `isCut` flag. Conflict prompts run up front on the
+    /// main thread; the actual copy/move then runs in the background via
+    /// FileOperationService (progress panel + cancel for big batches).
+    /// `completion` receives the URLs created at the destination and fires on
+    /// the main thread. The whole paste registers as one ⌘Z entry.
     ///
     /// A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
     /// With several conflicts the dialog offers "남은 항목 모두에 적용" so one
     /// answer can cover the rest. 취소 keeps the not-yet-pasted entries in the
     /// stack (they're still pending); otherwise the stack is cleared in both
     /// this process and the system pasteboard so users don't double-paste.
-    @discardableResult
-    func paste(into destination: URL) throws -> [URL] {
+    @MainActor
+    func paste(into destination: URL, completion: @escaping (Result<[URL], Error>) -> Void) {
         refreshFromPasteboardIfChanged()
         let entries = stack
         guard !entries.isEmpty else {
-            throw NSError(domain: "MFinder.Clipboard", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "클립보드가 비어 있습니다."])
+            completion(.failure(NSError(domain: "MFinder.Clipboard", code: 1,
+                                        userInfo: [NSLocalizedDescriptionKey: "클립보드가 비어 있습니다."])))
+            return
         }
 
         let fm = FileManager.default
@@ -137,50 +141,42 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         }.count
 
         var blanket: FileConflictChoice?
-        var created: [URL] = []
-        var firstError: Error?
         var cancelledAtIndex: Int?
+        var ops: [FileOperation] = []
 
         for (idx, entry) in entries.enumerated() {
             let target = destination.appendingPathComponent(entry.url.lastPathComponent)
             let sameLocation = target.standardizedFileURL == entry.url.standardizedFileURL
-            do {
-                let dst: URL
-                if entry.isCut {
-                    // Cut + paste into the same folder is a no-op.
-                    if sameLocation { continue }
-                    if fm.fileExists(atPath: target.path) {
-                        conflictsLeft -= 1
-                        let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
-                                                                remainingConflicts: conflictsLeft,
-                                                                blanket: &blanket)
-                        if choice == .skip { continue }
-                        if choice == .cancel { cancelledAtIndex = idx; break }
-                        try? fm.removeItem(at: target)
-                    }
-                    dst = target
-                    try fm.moveItem(at: entry.url, to: dst)
-                } else if sameLocation {
-                    // Copy + paste into the same folder → make a duplicate, never
-                    // overwrite the source onto itself.
-                    dst = uniqueDestination(for: entry.url, in: destination)
-                    try fm.copyItem(at: entry.url, to: dst)
-                } else {
-                    if fm.fileExists(atPath: target.path) {
-                        conflictsLeft -= 1
-                        let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
-                                                                remainingConflicts: conflictsLeft,
-                                                                blanket: &blanket)
-                        if choice == .skip { continue }
-                        if choice == .cancel { cancelledAtIndex = idx; break }
-                        try? fm.removeItem(at: target)
-                    }
-                    dst = target
-                    try fm.copyItem(at: entry.url, to: dst)
+            if entry.isCut {
+                // Cut + paste into the same folder is a no-op.
+                if sameLocation { continue }
+                if fm.fileExists(atPath: target.path) {
+                    conflictsLeft -= 1
+                    let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
+                                                            remainingConflicts: conflictsLeft,
+                                                            blanket: &blanket)
+                    if choice == .skip { continue }
+                    if choice == .cancel { cancelledAtIndex = idx; break }
+                    try? fm.removeItem(at: target)
                 }
-                created.append(dst)
-            } catch {
-                if firstError == nil { firstError = error }
+                ops.append(FileOperation(src: entry.url, dst: target, isMove: true))
+            } else if sameLocation {
+                // Copy + paste into the same folder → make a duplicate, never
+                // overwrite the source onto itself.
+                ops.append(FileOperation(src: entry.url,
+                                         dst: uniqueDestination(for: entry.url, in: destination),
+                                         isMove: false))
+            } else {
+                if fm.fileExists(atPath: target.path) {
+                    conflictsLeft -= 1
+                    let choice = blanket ?? askFileConflict(name: entry.url.lastPathComponent,
+                                                            remainingConflicts: conflictsLeft,
+                                                            blanket: &blanket)
+                    if choice == .skip { continue }
+                    if choice == .cancel { cancelledAtIndex = idx; break }
+                    try? fm.removeItem(at: target)
+                }
+                ops.append(FileOperation(src: entry.url, dst: target, isMove: false))
             }
         }
 
@@ -190,8 +186,27 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
         } else {
             commit([])
         }
-        if created.isEmpty, cancelledAtIndex == nil, let err = firstError { throw err }
-        return created
+
+        guard !ops.isEmpty else { completion(.success([])); return }
+        let title = ops.allSatisfy(\.isMove) ? "이동 중…"
+                  : ops.allSatisfy({ !$0.isMove }) ? "복사 중…" : "붙여넣는 중…"
+        FileOperationService.shared.perform(ops, title: title) { done, err in
+            let moved = done.filter(\.isMove).map { (from: $0.src, to: $0.dst) }
+            let copied = done.filter { !$0.isMove }.map(\.dst)
+            var actions: [UndoAction] = []
+            if !moved.isEmpty { actions.append(.move(pairs: moved)) }
+            if !copied.isEmpty { actions.append(.create(urls: copied)) }
+            if let single = actions.first, actions.count == 1 {
+                UndoService.shared.register(single, label: "붙여넣기")
+            } else if !actions.isEmpty {
+                UndoService.shared.register(.batch(actions), label: "붙여넣기")
+            }
+            if done.isEmpty, let err {
+                completion(.failure(err))
+            } else {
+                completion(.success(done.map(\.dst)))
+            }
+        }
     }
 
     // 덮어쓰기 확인 UI lives in FileConflictPrompt.swift (shared with drag-and-drop).

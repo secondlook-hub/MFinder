@@ -58,7 +58,11 @@ struct ContentView: View {
         }
         .alert("업데이트 사용 가능", isPresented: $updateChecker.updateAvailable) {
             if let downloadURL = updateChecker.downloadURL {
-                Button("다운로드") {
+                Button("자동 설치") {
+                    UpdateInstaller.shared.install(from: downloadURL,
+                                                   version: updateChecker.latestVersion)
+                }
+                Button("직접 다운로드") {
                     NSWorkspace.shared.open(downloadURL)
                 }
             }
@@ -69,7 +73,7 @@ struct ContentView: View {
             }
             Button("나중에", role: .cancel) {}
         } message: {
-            Text("MFinder \(updateChecker.latestVersion) 버전이 출시되었습니다.\n(현재 버전: \(updateChecker.currentVersion))")
+            Text("MFinder \(updateChecker.latestVersion) 버전이 출시되었습니다.\n(현재 버전: \(updateChecker.currentVersion))\n\n자동 설치를 누르면 다운로드부터 재실행까지 자동으로 진행됩니다.")
         }
         .alert("최신 버전 사용 중", isPresented: $updateChecker.upToDate) {
             Button("확인", role: .cancel) {}
@@ -82,6 +86,7 @@ struct ContentView: View {
 /// The full per-tab content (command bar + address bar + sidebar/list + status bar).
 private struct TabContent: View {
     @ObservedObject var tab: NavigationState
+    @ObservedObject private var uiState = AppUIState.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,6 +105,10 @@ private struct TabContent: View {
                     .frame(minWidth: 160, idealWidth: 240, maxWidth: 400)
                 FileListView()
                     .frame(minWidth: 400)
+                if uiState.showPreviewPane {
+                    PreviewPane()
+                        .frame(minWidth: 200, idealWidth: 300, maxWidth: 520)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             StatusBar()

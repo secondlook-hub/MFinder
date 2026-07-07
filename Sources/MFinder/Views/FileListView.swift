@@ -20,6 +20,7 @@ struct FileListView: View {
             case .content:          contentView
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(themes.theme.contentBackground.color)
         .contextMenu { emptySpaceMenu() }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderRenameSelected)) { _ in
@@ -74,6 +75,7 @@ struct FileListView: View {
                 }
                 .padding(8)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
@@ -124,6 +126,7 @@ struct FileListView: View {
                 }
             }
             .padding(8)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -175,6 +178,7 @@ struct FileListView: View {
                 }
             }
             .padding(8)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -262,6 +266,7 @@ struct FileListView: View {
                     Divider().opacity(0.3)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -310,19 +315,7 @@ struct FileListView: View {
             .keyboardShortcut("x", modifiers: .command)
         Button("복사") { ClipboardService.shared.copy(targets) }
             .keyboardShortcut("c", modifiers: .command)
-        Button("붙여넣기") {
-            do {
-                let created = try ClipboardService.shared.paste(into: nav.currentURL)
-                nav.reload(thenSelect: Set(created))
-            } catch {
-                let alert = NSAlert()
-                alert.messageText = "붙여넣기 실패"
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "확인")
-                alert.runModal()
-            }
-        }
+        Button("붙여넣기") { pasteIntoCurrentFolder() }
         .keyboardShortcut("v", modifiers: .command)
         .disabled(!clipboard.hasContent)
         Button("바로 가기 만들기") { createAliases(targets) }
@@ -353,10 +346,19 @@ struct FileListView: View {
             DispatchQueue.main.async { nav.renamingURL = item.url }
         }
         .keyboardShortcut(.return, modifiers: .command)
-        Button("휴지통으로 이동", role: .destructive) {
-            for url in targets {
-                try? FileSystemService.shared.moveToTrash(url)
+        if targets.count > 1 {
+            Button("일괄 이름 바꾸기 (\(targets.count)개)…") {
+                // Preserve list order for numbering (Set order is unstable).
+                let ordered = nav.filteredItems.map(\.url).filter(Set(targets).contains)
+                promptBatchRename(ordered, nav: nav)
             }
+        }
+        Button("휴지통으로 이동", role: .destructive) {
+            var trashed: [URL] = []
+            for url in targets where (try? FileSystemService.shared.moveToTrash(url)) != nil {
+                trashed.append(url)
+            }
+            UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
             nav.selectedItems.subtract(targets)
             nav.reload()
         }
@@ -476,7 +478,16 @@ struct FileListView: View {
         }
 
         Menu("그룹화 기준") {
-            Button("(없음)") { /* TODO */ }
+            ForEach(GroupField.allCases, id: \.self) { field in
+                Button {
+                    nav.groupField = field
+                } label: {
+                    HStack {
+                        if nav.groupField == field { Image(systemName: "checkmark") }
+                        Text(field.rawValue)
+                    }
+                }
+            }
         }
 
         Button("새로 고침") { nav.reload() }
@@ -484,26 +495,14 @@ struct FileListView: View {
 
         Divider()
 
-        Button("붙여넣기") {
-            do {
-                let created = try ClipboardService.shared.paste(into: nav.currentURL)
-                nav.reload(thenSelect: Set(created))
-            } catch {
-                let alert = NSAlert()
-                alert.messageText = "붙여넣기 실패"
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "확인")
-                alert.runModal()
-            }
-        }
+        Button("붙여넣기") { pasteIntoCurrentFolder() }
         .keyboardShortcut("v", modifiers: .command)
         .disabled(!ClipboardService.shared.hasContent)
 
         Button("바로 가기 붙여넣기") { pasteAsShortcut() }
             .disabled(!ClipboardService.shared.hasContent)
 
-        Button("실행 취소") { /* TODO */ }
+        Button("실행 취소") { UndoService.shared.undo() }
             .keyboardShortcut("z", modifiers: .command)
 
         Divider()
@@ -559,6 +558,17 @@ struct FileListView: View {
     }
 
     // MARK: - Menu actions
+
+    private func pasteIntoCurrentFolder() {
+        ClipboardService.shared.paste(into: nav.currentURL) { result in
+            switch result {
+            case .success(let created):
+                nav.reload(thenSelect: Set(created))
+            case .failure(let error):
+                showError("붙여넣기 실패", message: error.localizedDescription)
+            }
+        }
+    }
 
     private func currentTargets(for item: FileItem) -> [URL] {
         if nav.selectedItems.contains(item.url) {
@@ -895,10 +905,14 @@ struct FileListView: View {
     }
 
     private func createAliases(_ urls: [URL]) {
+        var created: [URL] = []
         for src in urls {
             let dst = unique("\(src.lastPathComponent) 바로 가기", in: nav.currentURL)
-            try? FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)
+            if (try? FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)) != nil {
+                created.append(dst)
+            }
         }
+        UndoService.shared.register(.create(urls: created), label: "바로 가기 만들기")
         nav.reload()
     }
 
@@ -952,13 +966,19 @@ struct FileListView: View {
 
     private func createNewFolder() {
         let url = unique("새 폴더", in: nav.currentURL)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        guard (try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)) != nil else {
+            nav.reload()
+            return
+        }
+        UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
         nav.reload()
     }
 
     private func createNewFile(name: String) {
         let url = unique(name, in: nav.currentURL)
-        FileManager.default.createFile(atPath: url.path, contents: Data())
+        if FileManager.default.createFile(atPath: url.path, contents: Data()) {
+            UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
+        }
         nav.reload()
     }
 
@@ -1041,6 +1061,7 @@ struct FileListView: View {
         guard !urls.isEmpty else { return }
         do {
             try FileSystemService.shared.moveToTrash(urls)
+            UndoService.shared.register(.trash(originals: urls), label: "휴지통으로 이동")
             nav.selectedItems.subtract(urls)
             nav.reload()
         } catch {
@@ -1112,6 +1133,7 @@ struct FileListView: View {
         let dst = item.url.deletingLastPathComponent().appendingPathComponent(trimmed)
         do {
             try FileManager.default.moveItem(at: item.url, to: dst)
+            UndoService.shared.register(.move(pairs: [(from: item.url, to: dst)]), label: "이름 바꾸기")
             nav.reload(thenSelect: [dst])
         } catch {
             let alert = NSAlert()

@@ -14,6 +14,27 @@ struct MFinderApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
+            // File-operation undo/redo (⌘Z / ⇧⌘Z). While a text field is
+            // being edited, forward to its own undo manager so typing undo
+            // keeps working; otherwise revert the last file operation.
+            CommandGroup(replacing: .undoRedo) {
+                Button("실행 취소") {
+                    if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+                       let um = textView.undoManager, um.canUndo {
+                        um.undo()
+                    } else {
+                        UndoService.shared.undo()
+                    }
+                }.keyboardShortcut("z", modifiers: .command)
+                Button("다시 실행") {
+                    if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+                       let um = textView.undoManager, um.canRedo {
+                        um.redo()
+                    } else {
+                        UndoService.shared.redo()
+                    }
+                }.keyboardShortcut("z", modifiers: [.command, .shift])
+            }
             CommandGroup(replacing: .newItem) {
                 Button("새 창") {
                     launchNewMFinderInstance()
@@ -55,6 +76,10 @@ struct MFinderApp: App {
             // a single 보기 menu rather than a custom Korean one next to the
             // English system one.
             CommandGroup(after: .toolbar) {
+                Divider()
+                Button("미리 보기 패널") {
+                    AppUIState.shared.showPreviewPane.toggle()
+                }.keyboardShortcut("p", modifiers: [.command, .shift])
                 Divider()
                 Button("글자 크게") {
                     ThemeService.shared.increaseFontSize()

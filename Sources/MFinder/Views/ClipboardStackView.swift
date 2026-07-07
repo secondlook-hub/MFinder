@@ -103,17 +103,19 @@ struct ClipboardStackView: View {
     }
 
     private func pasteAll() {
-        do {
-            let created = try clipboard.paste(into: nav.currentURL)
-            nav.reload(thenSelect: Set(created))
-            dismiss()
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "붙여넣기 실패"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "확인")
-            alert.runModal()
+        clipboard.paste(into: nav.currentURL) { result in
+            switch result {
+            case .success(let created):
+                nav.reload(thenSelect: Set(created))
+            case .failure(let error):
+                let alert = NSAlert()
+                alert.messageText = "붙여넣기 실패"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "확인")
+                alert.runModal()
+            }
         }
+        dismiss()
     }
 }

@@ -33,6 +33,13 @@ struct FileItem: Identifiable, Hashable {
         return f.string(from: modificationDate)
     }
 
+    var creationString: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd  a hh:mm"
+        f.locale = Locale(identifier: "ko_KR")
+        return f.string(from: creationDate)
+    }
+
     static func == (lhs: FileItem, rhs: FileItem) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }

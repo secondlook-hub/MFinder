@@ -298,11 +298,13 @@ struct CommandBar: View {
     }
 
     private func paste() {
-        do {
-            let created = try ClipboardService.shared.paste(into: nav.currentURL)
-            nav.reload(thenSelect: Set(created))
-        } catch {
-            commandAlert("붙여넣기 실패", error.localizedDescription)
+        ClipboardService.shared.paste(into: nav.currentURL) { result in
+            switch result {
+            case .success(let created):
+                nav.reload(thenSelect: Set(created))
+            case .failure(let error):
+                commandAlert("붙여넣기 실패", error.localizedDescription)
+            }
         }
     }
 
@@ -310,11 +312,16 @@ struct CommandBar: View {
         let urls = orderedSelection()
         guard !urls.isEmpty else { return }
         var firstErr: Error?
+        var trashed: [URL] = []
         for url in urls {
-            do { try FileSystemService.shared.moveToTrash(url) } catch {
+            do {
+                try FileSystemService.shared.moveToTrash(url)
+                trashed.append(url)
+            } catch {
                 if firstErr == nil { firstErr = error }
             }
         }
+        UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
         nav.selectedItems.removeAll()
         nav.reload()
         if let err = firstErr {

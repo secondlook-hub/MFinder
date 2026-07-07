@@ -68,6 +68,7 @@ func promptRenameTreeFolder(_ folder: URL, nav: NavigationState, tree: FolderTre
     let dst = folder.deletingLastPathComponent().appendingPathComponent(newName)
     do {
         try FileManager.default.moveItem(at: folder, to: dst)
+        UndoService.shared.register(.move(pairs: [(from: folder, to: dst)]), label: "이름 바꾸기")
         tree.reloadChildren(of: folder.deletingLastPathComponent())
         if folder.standardizedFileURL == nav.currentURL.standardizedFileURL {
             nav.navigate(to: dst)
@@ -92,13 +93,16 @@ func trashTreeFolders(_ folders: [URL], nav: NavigationState, tree: FolderTreeSt
     alert.addButton(withTitle: "취소")
     guard alert.runModal() == .alertFirstButtonReturn else { return }
     var firstErr: Error?
+    var trashed: [URL] = []
     for folder in folders {
         do {
             try FileSystemService.shared.moveToTrash(folder)
+            trashed.append(folder)
         } catch {
             if firstErr == nil { firstErr = error }
         }
     }
+    UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
     let parents = Set(folders.map { $0.deletingLastPathComponent() })
     for p in parents { tree.reloadChildren(of: p) }
     let trashedSet = Set(folders.map { $0.standardizedFileURL })
@@ -126,6 +130,7 @@ func trashTreeFolder(_ folder: URL, nav: NavigationState, tree: FolderTreeStore)
     guard alert.runModal() == .alertFirstButtonReturn else { return }
     do {
         try FileSystemService.shared.moveToTrash(folder)
+        UndoService.shared.register(.trash(originals: [folder]), label: "휴지통으로 이동")
         let parent = folder.deletingLastPathComponent()
         tree.reloadChildren(of: parent)
         if folder.standardizedFileURL == nav.currentURL.standardizedFileURL {
@@ -206,6 +211,7 @@ func createNewFileShared(name: String, in dst: URL, nav: NavigationState, tree: 
 
 @MainActor
 private func afterCreating(_ url: URL, parent: URL, nav: NavigationState, tree: FolderTreeStore) {
+    UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
     tree.reloadChildren(of: parent)
     if parent.standardizedFileURL == nav.currentURL.standardizedFileURL {
         nav.reload(thenSelect: [url])
@@ -214,13 +220,15 @@ private func afterCreating(_ url: URL, parent: URL, nav: NavigationState, tree: 
 
 @MainActor
 func pasteIntoFolderShared(_ dst: URL, nav: NavigationState, tree: FolderTreeStore) {
-    do {
-        let created = try ClipboardService.shared.paste(into: dst)
-        tree.reloadChildren(of: dst)
-        if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
-            nav.reload(thenSelect: Set(created))
+    ClipboardService.shared.paste(into: dst) { result in
+        switch result {
+        case .success(let created):
+            tree.reloadChildren(of: dst)
+            if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
+                nav.reload(thenSelect: Set(created))
+            }
+        case .failure(let error):
+            showTreeAlert("붙여넣기 실패", error.localizedDescription)
         }
-    } catch {
-        showTreeAlert("붙여넣기 실패", error.localizedDescription)
     }
 }

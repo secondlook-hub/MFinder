@@ -102,11 +102,22 @@ final class ThemeService: ObservableObject {
     private let kSelectedTheme = "MFinder.theme.selected"
     private let kCustomThemes  = "MFinder.theme.custom"
     private let kFontSize      = "MFinder.fontSize"
+    private let kFollowSystem  = "MFinder.theme.followSystem"
 
     @Published var current: Theme {
         didSet {
             defaults.set(current.name, forKey: kSelectedTheme)
             applyAppearance()
+        }
+    }
+
+    /// When on, the 라이트/다크 builtin follows the macOS appearance
+    /// (시스템 설정 → 화면 모드) live — the app no longer sits white in a
+    /// dark desktop. Picking a theme by hand in 설정 switches this off.
+    @Published var followSystemAppearance: Bool {
+        didSet {
+            defaults.set(followSystemAppearance, forKey: kFollowSystem)
+            if followSystemAppearance { syncToSystemAppearance() }
         }
     }
 
@@ -139,7 +150,49 @@ final class ThemeService: ObservableObject {
             ? CGFloat(storedSize).clamped(to: Self.fontSizeRange)
             : Self.defaultFontSize
 
+        // Default ON unless the user ever picked a theme by hand (then keep
+        // honoring that explicit choice until they opt back in via 설정).
+        if defaults.object(forKey: kFollowSystem) != nil {
+            followSystemAppearance = defaults.bool(forKey: kFollowSystem)
+        } else {
+            followSystemAppearance = defaults.string(forKey: kSelectedTheme) == nil
+            // Persist the first-launch decision now — syncToSystemAppearance
+            // below writes kSelectedTheme, which would flip the heuristic to
+            // false on the next launch otherwise.
+            defaults.set(followSystemAppearance, forKey: kFollowSystem)
+        }
+
         applyAppearance()
+        installSystemAppearanceObserver()
+        if followSystemAppearance { syncToSystemAppearance() }
+    }
+
+    // MARK: - System appearance sync
+
+    /// "AppleInterfaceThemeChangedNotification" fires when 시스템 설정 flips
+    /// light/dark (it's a distributed notification; the queue is main).
+    private func installSystemAppearanceObserver() {
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            DispatchQueue.main.async {
+                ThemeService.shared.syncToSystemAppearance()
+            }
+        }
+    }
+
+    /// NSApp.appearance is pinned by applyAppearance, so read the system
+    /// preference directly instead of effectiveAppearance.
+    private static func systemPrefersDark() -> Bool {
+        UserDefaults.standard.string(forKey: "AppleInterfaceStyle")?.lowercased() == "dark"
+    }
+
+    private func syncToSystemAppearance() {
+        guard followSystemAppearance else { return }
+        let target: Theme = Self.systemPrefersDark() ? .dark : .light
+        if current != target { current = target }
     }
 
     var allThemes: [Theme] { Theme.builtins + customThemes }
@@ -171,6 +224,7 @@ final class ThemeService: ObservableObject {
         } else {
             customThemes.append(theme)
         }
+        followSystemAppearance = false
         current = theme
     }
 

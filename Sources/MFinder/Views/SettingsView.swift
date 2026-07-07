@@ -40,6 +40,7 @@ struct SettingsView: View {
             // ── 테마
             VStack(alignment: .leading, spacing: 6) {
                 Text("테마").font(.headline)
+                Toggle("시스템 화면 모드에 맞춤 (라이트/다크 자동 전환)", isOn: $themes.followSystemAppearance)
                 Picker("테마", selection: selectedThemeName) {
                     Section("기본 테마") {
                         ForEach(Theme.builtins) { Text($0.name).tag($0.name) }
@@ -52,6 +53,7 @@ struct SettingsView: View {
                 }
                 .labelsHidden()
                 .frame(width: 220)
+                .disabled(themes.followSystemAppearance)
 
                 themePreview(themes.current)
 
@@ -87,6 +89,8 @@ struct SettingsView: View {
             get: { themes.current.name },
             set: { name in
                 if let t = themes.allThemes.first(where: { $0.name == name }) {
+                    // A hand-picked theme overrides the follow-system mode.
+                    themes.followSystemAppearance = false
                     themes.current = t
                 }
             }

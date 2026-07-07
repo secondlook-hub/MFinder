@@ -34,19 +34,39 @@ struct FileTableView: NSViewRepresentable {
         tableView.allowsEmptySelection = true
         tableView.allowsColumnResizing = true
         tableView.columnAutoresizingStyle = .noColumnAutoresizing
+        // Group headers (그룹화 기준) scroll with content; floating them
+        // fights the custom zebra row backgrounds.
+        tableView.floatsGroupRows = false
         tableView.headerView = NSTableHeaderView()
         tableView.target = context.coordinator
         tableView.doubleAction = #selector(Coordinator.doubleClick(_:))
 
-        addColumn(to: tableView, id: "name",     title: "이름",       width: 260, minWidth: 120, maxWidth: 1200)
-        addColumn(to: tableView, id: "modified", title: "수정한 날짜", width: 160, minWidth: 90,  maxWidth: 320)
-        addColumn(to: tableView, id: "type",     title: "유형",       width: 140, minWidth: 70,  maxWidth: 320)
-        addColumn(to: tableView, id: "size",     title: "크기",       width: 90,  minWidth: 60,  maxWidth: 200)
-        addColumn(to: tableView, id: "location", title: "위치",       width: 260, minWidth: 80,  maxWidth: 800)
+        addColumn(to: tableView, id: "name",      title: "이름",       width: 260, minWidth: 120, maxWidth: 1200)
+        addColumn(to: tableView, id: "modified",  title: "수정한 날짜", width: 160, minWidth: 90,  maxWidth: 320)
+        addColumn(to: tableView, id: "type",      title: "유형",       width: 140, minWidth: 70,  maxWidth: 320)
+        addColumn(to: tableView, id: "size",      title: "크기",       width: 90,  minWidth: 60,  maxWidth: 200)
+        addColumn(to: tableView, id: "created",   title: "만든 날짜",   width: 160, minWidth: 90,  maxWidth: 320)
+        addColumn(to: tableView, id: "extension", title: "확장명",     width: 70,  minWidth: 50,  maxWidth: 160)
+        addColumn(to: tableView, id: "location",  title: "위치",       width: 260, minWidth: 80,  maxWidth: 800)
         // The "위치" column is meaningful only for search results.
         // (The matched-text preview is rendered inline under the filename in
         // the name column, not in a separate column.)
         tableView.tableColumn(withIdentifier: .init("location"))?.isHidden = true
+
+        // Explorer-style column visibility: only "name" is fixed; the rest
+        // follow the persisted header-menu choices.
+        let visible = Set(PreferencesService.shared.detailColumns)
+        for (id, _) in FileTableView.toggleableColumns {
+            tableView.tableColumn(withIdentifier: .init(id))?.isHidden = !visible.contains(id)
+        }
+
+        // Right-clicking the column header lists toggleable columns,
+        // mirroring Windows Explorer's header context menu.
+        let headerMenu = NSMenu()
+        headerMenu.autoenablesItems = false
+        headerMenu.delegate = context.coordinator
+        tableView.headerView?.menu = headerMenu
+        context.coordinator.headerMenu = headerMenu
 
         tableView.dataSource = context.coordinator
         tableView.delegate = context.coordinator
@@ -114,10 +134,13 @@ struct FileTableView: NSViewRepresentable {
             coord.cutURLs = newCutSet
         }
 
-        // Reload when items, search context, cut highlighting, or styling changed.
+        // Reload when items, search context, grouping, cut highlighting, or
+        // styling changed. Assigning coord.items rebuilds the display rows.
+        let groupChanged = coord.lastGroupField != nav.groupField
         if coord.lastDataVersion != nav.dataVersion || searchStateChanged || cutSetChanged
-            || themeChanged || fontChanged {
+            || themeChanged || fontChanged || groupChanged {
             coord.lastDataVersion = nav.dataVersion
+            coord.lastGroupField = nav.groupField
             coord.items = nav.filteredItems
             tableView.reloadData()
         }
@@ -133,7 +156,7 @@ struct FileTableView: NSViewRepresentable {
         let desiredHeight: CGFloat = inSearch ? themes.rowHeight * 2 : themes.rowHeight
         if abs(tableView.rowHeight - desiredHeight) > 0.5 {
             tableView.rowHeight = desiredHeight
-            tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<coord.items.count))
+            tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<coord.rows.count))
         }
 
         // External rename trigger (F2 or menu): when nav.renamingURL is set
@@ -147,7 +170,7 @@ struct FileTableView: NSViewRepresentable {
         if AppFocus.area == .fileList,
            let renameURL = nav.renamingURL,
            coord.lastRenamingURL != renameURL,
-           let row = coord.items.firstIndex(where: { $0.url == renameURL }) {
+           let row = coord.rowIndex(of: renameURL) {
             coord.lastRenamingURL = renameURL
             DispatchQueue.main.async {
                 coord.startInlineRename(at: row)
@@ -160,8 +183,10 @@ struct FileTableView: NSViewRepresentable {
         let selectedURLs = nav.selectedItems
         if !selectedURLs.isEmpty || !tableView.selectedRowIndexes.isEmpty {
             var indices = IndexSet()
-            for (idx, item) in coord.items.enumerated() where selectedURLs.contains(item.url) {
-                indices.insert(idx)
+            for (idx, row) in coord.rows.enumerated() {
+                if case .item(let item) = row, selectedURLs.contains(item.url) {
+                    indices.insert(idx)
+                }
             }
             if tableView.selectedRowIndexes != indices {
                 coord.suppressSelectionNotification = true
@@ -215,18 +240,44 @@ struct FileTableView: NSViewRepresentable {
         case .modified: return "modified"
         case .type:     return "type"
         case .size:     return "size"
+        case .created:  return "created"
+        case .ext:      return "extension"
         }
     }
+
+    /// Columns the user can show/hide from the header context menu, in menu
+    /// order. "name" is always visible and "location" is search-managed, so
+    /// neither appears here.
+    static let toggleableColumns: [(id: String, title: String)] = [
+        ("modified",  "수정한 날짜"),
+        ("type",      "유형"),
+        ("size",      "크기"),
+        ("created",   "만든 날짜"),
+        ("extension", "확장명"),
+    ]
 }
 
 // MARK: - Coordinator
 
 extension FileTableView {
+    /// One display row: either a bold group header (grouping active) or a file.
+    enum TableRow {
+        case group(String)
+        case item(FileItem)
+    }
+
     @MainActor
     final class Coordinator: NSObject {
         var parent: FileTableView
         weak var tableView: NSTableView?
-        var items: [FileItem] = []
+        weak var headerMenu: NSMenu?
+        var items: [FileItem] = [] {
+            didSet { rebuildRows() }
+        }
+        /// Display rows derived from `items` + the active group field.
+        /// All NSTableView row indices refer to THIS array, not `items`.
+        private(set) var rows: [TableRow] = []
+        var lastGroupField: GroupField = .none
         var lastDataVersion: Int = -1
         var lastTheme: Theme? = nil
         var lastFontSize: CGFloat = -1
@@ -240,9 +291,112 @@ extension FileTableView {
 
         init(_ parent: FileTableView) { self.parent = parent }
 
+        // MARK: - Row model (grouping)
+
+        func item(at row: Int) -> FileItem? {
+            guard row >= 0, row < rows.count, case .item(let item) = rows[row] else { return nil }
+            return item
+        }
+
+        func isGroupRow(_ row: Int) -> Bool {
+            guard row >= 0, row < rows.count, case .group = rows[row] else { return false }
+            return true
+        }
+
+        func rowIndex(of url: URL) -> Int? {
+            rows.firstIndex {
+                if case .item(let item) = $0 { return item.url == url }
+                return false
+            }
+        }
+
+        /// Rebuilds `rows` from `items`. Grouping is suspended during search
+        /// (results span many folders; buckets would be misleading).
+        func rebuildRows() {
+            let field = parent.nav.groupField
+            guard field != .none, searchQuery == nil, !items.isEmpty else {
+                rows = items.map { .item($0) }
+                return
+            }
+            // Stable bucketing: items keep their sorted order inside groups.
+            var order: [String] = []
+            var rank: [String: Int] = [:]
+            var buckets: [String: [FileItem]] = [:]
+            for item in items {
+                let key = Self.groupKey(for: item, field: field)
+                if buckets[key.label] == nil {
+                    order.append(key.label)
+                    rank[key.label] = key.rank
+                    buckets[key.label] = []
+                }
+                buckets[key.label]?.append(item)
+            }
+            order.sort {
+                let (r0, r1) = (rank[$0] ?? 0, rank[$1] ?? 0)
+                if r0 != r1 { return r0 < r1 }
+                return $0.localizedStandardCompare($1) == .orderedAscending
+            }
+            var built: [TableRow] = []
+            for label in order {
+                let members = buckets[label] ?? []
+                built.append(.group("\(label) (\(members.count))"))
+                built.append(contentsOf: members.map { .item($0) })
+            }
+            rows = built
+        }
+
+        /// (rank, label) for one item under `field`. Rank orders buckets
+        /// (dates: newest bucket first; sizes: small → large); ties fall back
+        /// to alphabetical labels.
+        private static func groupKey(for item: FileItem, field: GroupField) -> (rank: Int, label: String) {
+            switch field {
+            case .none:
+                return (0, "")
+            case .name:
+                guard let first = item.name.first else { return (1, "#") }
+                if first.isNumber { return (0, "0 - 9") }
+                return (1, String(first).uppercased())
+            case .type:
+                return (0, item.typeDescription)
+            case .ext:
+                if item.isDirectory { return (-1, "폴더") }
+                return item.ext.isEmpty ? (0, "(확장명 없음)") : (1, item.ext)
+            case .modified:
+                return dateBucket(item.modificationDate)
+            case .created:
+                return dateBucket(item.creationDate)
+            case .size:
+                if item.isDirectory { return (0, "폴더") }
+                let kb: Int64 = 1024, mb = kb * 1024, gb = mb * 1024
+                switch item.size {
+                case 0:                return (1, "비어 있음")
+                case ..<(16 * kb):     return (2, "아주 작음 (16KB 미만)")
+                case ..<mb:            return (3, "작음 (16KB - 1MB)")
+                case ..<(128 * mb):    return (4, "보통 (1MB - 128MB)")
+                case ..<gb:            return (5, "큼 (128MB - 1GB)")
+                case ..<(4 * gb):      return (6, "아주 큼 (1GB - 4GB)")
+                default:               return (7, "매우 큼 (4GB 이상)")
+                }
+            }
+        }
+
+        private static func dateBucket(_ date: Date) -> (rank: Int, label: String) {
+            let cal = Calendar.current
+            let now = Date()
+            if cal.isDateInToday(date) { return (0, "오늘") }
+            if cal.isDateInYesterday(date) { return (1, "어제") }
+            if cal.isDate(date, equalTo: now, toGranularity: .weekOfYear) { return (2, "이번 주") }
+            if let lastWeek = cal.date(byAdding: .weekOfYear, value: -1, to: now),
+               cal.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear) { return (3, "지난주") }
+            if cal.isDate(date, equalTo: now, toGranularity: .month) { return (4, "이번 달") }
+            if cal.isDate(date, equalTo: now, toGranularity: .year) { return (5, "올해") }
+            if date > now { return (0, "오늘") }
+            return (6, "오래 전")
+        }
+
         @objc func doubleClick(_ sender: Any?) {
-            guard let tv = tableView, tv.clickedRow >= 0, tv.clickedRow < items.count else { return }
-            open(items[tv.clickedRow])
+            guard let tv = tableView, let item = item(at: tv.clickedRow) else { return }
+            open(item)
         }
 
         fileprivate func open(_ item: FileItem) {
@@ -276,18 +430,25 @@ extension FileTableView {
         }
 
         func performPaste() {
-            do {
-                let created = try ClipboardService.shared.paste(into: parent.nav.currentURL)
-                parent.nav.reload(thenSelect: Set(created))
-            } catch {
-                alertError("붙여넣기 실패", message: error.localizedDescription)
+            let nav = parent.nav
+            ClipboardService.shared.paste(into: nav.currentURL) { [weak self] result in
+                switch result {
+                case .success(let created):
+                    nav.reload(thenSelect: Set(created))
+                case .failure(let error):
+                    self?.alertError("붙여넣기 실패", message: error.localizedDescription)
+                }
             }
         }
 
         func performDelete() {
             let urls = currentSelectedURLs()
             guard !urls.isEmpty else { return }
-            for url in urls { try? FileSystemService.shared.moveToTrash(url) }
+            var trashed: [URL] = []
+            for url in urls where (try? FileSystemService.shared.moveToTrash(url)) != nil {
+                trashed.append(url)
+            }
+            UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
             parent.nav.selectedItems.subtract(urls)
             parent.nav.reload()
         }
@@ -306,9 +467,7 @@ extension FileTableView {
 
         private func currentSelectedURLs() -> [URL] {
             guard let tv = tableView else { return [] }
-            return tv.selectedRowIndexes.compactMap { idx in
-                idx < items.count ? items[idx].url : nil
-            }
+            return tv.selectedRowIndexes.compactMap { item(at: $0)?.url }
         }
 
         // MARK: - Inline rename (F2 / click-after-pause)
@@ -317,7 +476,7 @@ extension FileTableView {
         /// and begins editing. Selects the basename (excluding extension) so the user
         /// can replace the name without disturbing the extension, matching Finder.
         func startInlineRename(at row: Int) {
-            guard let tv = tableView, row >= 0, row < items.count else { return }
+            guard let tv = tableView, let item = item(at: row) else { return }
             guard let cell = tv.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSTableCellView,
                   let tf = cell.textField else { return }
             tf.isEditable = true
@@ -336,7 +495,6 @@ extension FileTableView {
                 tv.window?.makeFirstResponder(tv)
             }
             // After editColumn, the field editor is active. Select the basename only for files.
-            let item = items[row]
             if !item.isDirectory,
                let dotRange = item.name.range(of: ".", options: .backwards),
                let editor = tf.window?.fieldEditor(true, for: tf) as? NSTextView {
@@ -483,16 +641,18 @@ final class FileNSTableView: NSTableView, NSMenuItemValidation {
 }
 
 extension FileTableView.Coordinator: NSTableViewDataSource {
-    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
         guard !suppressSortNotification, let desc = tableView.sortDescriptors.first else { return }
         let field: SortField
         switch desc.key {
-        case "name":     field = .name
-        case "modified": field = .modified
-        case "type":     field = .type
-        case "size":     field = .size
+        case "name":      field = .name
+        case "modified":  field = .modified
+        case "type":      field = .type
+        case "size":      field = .size
+        case "created":   field = .created
+        case "extension": field = .ext
         default: return
         }
         parent.nav.applySort(field: field, ascending: desc.ascending)
@@ -501,11 +661,11 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
     // MARK: Drag source — let users drag rows out to Finder/other apps/back into MFinder
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        guard row >= 0, row < items.count else { return nil }
+        guard let item = item(at: row) else { return nil }
         // A drag is starting — cancel the click-and-pause rename timer so it
         // can't fire mid-drag and open a stray edit field.
         (tableView as? FileNSTableView)?.cancelPendingRename()
-        return items[row].url as NSURL
+        return item.url as NSURL
     }
 
     // MARK: Drop destination — accept file drops from anywhere
@@ -515,9 +675,10 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
         // Determine drop target folder. `row` arrives as -1 for drops on
         // the empty area, and AppKit can occasionally hand us a stale row
         // index right after an FSEvent-triggered reload shrank the list —
-        // so check both bounds before indexing.
-        let targetURL: URL? = (op == .on && row >= 0 && row < items.count && items[row].isDirectory)
-            ? items[row].url
+        // item(at:) checks bounds and skips group rows.
+        let rowItem = op == .on ? item(at: row) : nil
+        let targetURL: URL? = (rowItem?.isDirectory == true)
+            ? rowItem?.url
             : parent.nav.currentURL
 
         guard let dst = targetURL else { return [] }
@@ -556,8 +717,8 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
               !urls.isEmpty else { return false }
 
         let dst: URL
-        if op == .on, row >= 0, row < items.count, items[row].isDirectory {
-            dst = items[row].url
+        if op == .on, let rowItem = item(at: row), rowItem.isDirectory {
+            dst = rowItem.url
         } else {
             dst = parent.nav.currentURL
         }
@@ -587,8 +748,7 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
         }.count
         var blanket: FileConflictChoice?
 
-        var landed: [URL] = []
-        var firstErr: Error?
+        var ops: [FileOperation] = []
         for src in urls {
             // Skip self-drop or into own parent.
             if src.standardizedFileURL == dst.standardizedFileURL { continue }
@@ -613,29 +773,32 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
                 }
                 target = plainTarget
             }
-            do {
-                if shouldMove {
-                    try FileManager.default.moveItem(at: src, to: target)
-                } else {
-                    try FileManager.default.copyItem(at: src, to: target)
-                }
-                landed.append(target)
-            } catch {
-                if firstErr == nil { firstErr = error }
+            ops.append(FileOperation(src: src, dst: target, isMove: shouldMove))
+        }
+        guard !ops.isEmpty else { return false }
+
+        // The copy/move runs in the background with a progress panel; reload
+        // and select once it lands.
+        let nav = parent.nav
+        FileOperationService.shared.perform(ops, title: shouldMove ? "이동 중…" : "복사 중…") { [weak self] done, err in
+            let landed = done.map(\.dst)
+            if shouldMove {
+                UndoService.shared.register(.move(pairs: done.map { (from: $0.src, to: $0.dst) }),
+                                            label: "이동")
+            } else {
+                UndoService.shared.register(.create(urls: landed), label: "복사")
+            }
+            // If we dropped into the current folder, reload + select new items.
+            if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
+                nav.reload(thenSelect: Set(landed))
+            } else {
+                nav.reload()
+            }
+            if let err, landed.isEmpty {
+                self?.alertError("드롭 실패", message: err.localizedDescription)
             }
         }
-
-        // If we dropped into the current folder, reload + select new items.
-        if dst.standardizedFileURL == parent.nav.currentURL.standardizedFileURL {
-            parent.nav.reload(thenSelect: Set(landed))
-        } else {
-            parent.nav.reload()
-        }
-
-        if let err = firstErr, landed.isEmpty {
-            alertError("드롭 실패", message: err.localizedDescription)
-        }
-        return !landed.isEmpty
+        return true
     }
 
     private func uniqueDestinationName(_ name: String, in dir: URL) -> URL {
@@ -656,17 +819,38 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
 }
 
 extension FileTableView.Coordinator: NSTableViewDelegate {
+    /// Group header rows: full-width bold labels, not selectable.
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        isGroupRow(row)
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        !isGroupRow(row)
+    }
+
+    /// Type-ahead: typing jumps to the next matching filename.
+    func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?,
+                   row: Int) -> String? {
+        guard tableColumn == nil || tableColumn?.identifier.rawValue == "name" else { return nil }
+        return item(at: row)?.name
+    }
+
     func tableView(_ tableView: NSTableView,
                    viewFor tableColumn: NSTableColumn?,
                    row: Int) -> NSView? {
-        guard let col = tableColumn, row >= 0, row < items.count else { return nil }
-        let item = items[row]
+        guard row >= 0, row < rows.count else { return nil }
+        if case .group(let label) = rows[row] {
+            return reusableGroupCell(label, tableView: tableView)
+        }
+        guard let col = tableColumn, case .item(let item) = rows[row] else { return nil }
         let cell: NSTableCellView?
         switch col.identifier.rawValue {
         case "name":     cell = reusableNameCell(for: item, tableView: tableView)
         case "modified": cell = reusableTextCell(item.modificationString, alignment: .left, id: "modCell", tableView: tableView)
         case "type":     cell = reusableTextCell(item.typeDescription,    alignment: .left, id: "typeCell", tableView: tableView)
         case "size":     cell = reusableTextCell(item.sizeString,         alignment: .right, id: "sizeCell", tableView: tableView)
+        case "created":  cell = reusableTextCell(item.creationString,     alignment: .left, id: "createdCell", tableView: tableView)
+        case "extension": cell = reusableTextCell(item.ext,               alignment: .left, id: "extCell", tableView: tableView)
         case "location": cell = reusableTextCell(relativeLocationLabel(for: item), alignment: .left, id: "locCell", tableView: tableView)
         default:         cell = nil
         }
@@ -849,6 +1033,32 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         return nil
     }
 
+    private func reusableGroupCell(_ label: String, tableView: NSTableView) -> NSTableCellView {
+        let nid = NSUserInterfaceItemIdentifier("groupCell")
+        let cell: NSTableCellView
+        if let reused = tableView.makeView(withIdentifier: nid, owner: self) as? NSTableCellView {
+            cell = reused
+        } else {
+            cell = NSTableCellView()
+            cell.identifier = nid
+            let tf = NSTextField(labelWithString: "")
+            tf.translatesAutoresizingMaskIntoConstraints = false
+            tf.lineBreakMode = .byTruncatingTail
+            cell.textField = tf
+            cell.addSubview(tf)
+            NSLayoutConstraint.activate([
+                tf.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
+                tf.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+        }
+        let theming = ThemeService.shared
+        cell.textField?.font = NSFont.systemFont(ofSize: theming.fontSize, weight: .bold)
+        cell.textField?.textColor = theming.theme.text.nsColor
+        cell.textField?.stringValue = label
+        return cell
+    }
+
     private func reusableTextCell(_ text: String, alignment: NSTextAlignment, id: String, tableView: NSTableView) -> NSTableCellView {
         let nid = NSUserInterfaceItemIdentifier(id)
         let cell: NSTableCellView
@@ -880,8 +1090,8 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !suppressSelectionNotification, let tv = tableView else { return }
         var sel = Set<URL>()
-        for idx in tv.selectedRowIndexes where idx < items.count {
-            sel.insert(items[idx].url)
+        for idx in tv.selectedRowIndexes {
+            if let item = item(at: idx) { sel.insert(item.url) }
         }
         if parent.nav.selectedItems != sel {
             parent.nav.selectedItems = sel
@@ -901,9 +1111,11 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         let rowView = FileNSTableRowView()
         let theme = ThemeService.shared.theme
-        rowView.zebraColor = row % 2 == 1
-            ? theme.contentBackgroundAlternate.nsColor
-            : theme.contentBackground.nsColor
+        // Group headers use the flat content background; item rows keep the
+        // zebra stripes (parity by row keeps stripes stable while scrolling).
+        rowView.zebraColor = (isGroupRow(row) || row % 2 == 0)
+            ? theme.contentBackground.nsColor
+            : theme.contentBackgroundAlternate.nsColor
         return rowView
     }
 }
@@ -930,15 +1142,14 @@ extension FileTableView.Coordinator: NSTextFieldDelegate {
         }
         // Find which row this textField belongs to.
         var row = -1
-        for r in 0..<items.count {
+        for r in 0..<rows.count {
             if let cell = tv.view(atColumn: 0, row: r, makeIfNecessary: false) as? NSTableCellView,
                cell.textField === tf {
                 row = r
                 break
             }
         }
-        guard row >= 0, row < items.count else { return }
-        let item = items[row]
+        guard let item = item(at: row) else { return }
         let newName = tf.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if newName.isEmpty || newName == item.name {
             tf.stringValue = item.name
@@ -947,6 +1158,7 @@ extension FileTableView.Coordinator: NSTextFieldDelegate {
         let dst = item.url.deletingLastPathComponent().appendingPathComponent(newName)
         do {
             try FileManager.default.moveItem(at: item.url, to: dst)
+            UndoService.shared.register(.move(pairs: [(from: item.url, to: dst)]), label: "이름 바꾸기")
             parent.nav.reload(thenSelect: [dst])
         } catch {
             tf.stringValue = item.name
@@ -958,10 +1170,10 @@ extension FileTableView.Coordinator: NSTextFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
             if let table = tableView, let tf = control as? NSTextField {
-                for r in 0..<items.count {
+                for r in 0..<rows.count {
                     if let cell = table.view(atColumn: 0, row: r, makeIfNecessary: false) as? NSTableCellView,
-                       cell.textField === tf {
-                        tf.stringValue = items[r].name
+                       cell.textField === tf, let item = item(at: r) {
+                        tf.stringValue = item.name
                         break
                     }
                 }
@@ -979,8 +1191,13 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         guard let tv = tableView else { return }
+        if menu === headerMenu {
+            buildHeaderMenu(menu)
+            return
+        }
         let clicked = tv.clickedRow
-        if clicked < 0 || clicked >= items.count {
+        guard let target = item(at: clicked) else {
+            // Empty area or a group header row → folder-level menu.
             buildEmptyMenu(menu)
             return
         }
@@ -988,14 +1205,40 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         if !tv.selectedRowIndexes.contains(clicked) {
             tv.selectRowIndexes(IndexSet(integer: clicked), byExtendingSelection: false)
         }
-        let target = items[clicked]
         let allTargets: [URL] = {
-            let urls = tv.selectedRowIndexes.compactMap { idx -> URL? in
-                idx < items.count ? items[idx].url : nil
-            }
+            let urls = tv.selectedRowIndexes.compactMap { item(at: $0)?.url }
             return urls.isEmpty ? [target.url] : urls
         }()
         buildFileMenu(menu, target: target, urls: allTargets)
+    }
+
+    // MARK: header menu (column visibility, Explorer-style)
+
+    private func buildHeaderMenu(_ menu: NSMenu) {
+        guard let tv = tableView else { return }
+        // "name" is always on and can't be toggled off.
+        let nameItem = block("이름") {}
+        nameItem.state = .on
+        nameItem.isEnabled = false
+        menu.addItem(nameItem)
+        for (id, title) in FileTableView.toggleableColumns {
+            guard let col = tv.tableColumn(withIdentifier: .init(id)) else { continue }
+            let item = block(title) { [weak self] in
+                self?.toggleColumnVisibility(id)
+            }
+            item.state = col.isHidden ? .off : .on
+            menu.addItem(item)
+        }
+    }
+
+    private func toggleColumnVisibility(_ id: String) {
+        guard let tv = tableView,
+              let col = tv.tableColumn(withIdentifier: .init(id)) else { return }
+        col.isHidden.toggle()
+        var visible = PreferencesService.shared.detailColumns
+        visible.removeAll { $0 == id }
+        if !col.isHidden { visible.append(id) }
+        PreferencesService.shared.detailColumns = visible
     }
 
     // MARK: file menu
@@ -1126,7 +1369,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
         menu.addItem(block("이름 바꾸기") { [weak self] in
             guard let self = self,
-                  let row = self.items.firstIndex(where: { $0.url == target.url })
+                  let row = self.rowIndex(of: target.url)
             else { return }
             // Defer one tick so NSMenu has fully dismissed and the table view
             // is back in the responder chain before editColumn fires.
@@ -1134,6 +1377,12 @@ extension FileTableView.Coordinator: NSMenuDelegate {
                 self.startInlineRename(at: row)
             }
         })
+        if urls.count > 1 {
+            menu.addItem(block("일괄 이름 바꾸기 (\(urls.count)개)…") { [weak self] in
+                guard let self else { return }
+                promptBatchRename(urls, nav: self.parent.nav)
+            })
+        }
         menu.addItem(block("휴지통으로 이동") { [weak self] in
             self?.moveToTrash(urls)
         })
@@ -1276,7 +1525,26 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         sortItem.submenu = sortMenu
         menu.addItem(sortItem)
 
+        // Group
+        let groupItem = NSMenuItem(title: "그룹화 기준", action: nil, keyEquivalent: "")
+        let groupMenu = NSMenu()
+        for field in GroupField.allCases {
+            let it = block(field.rawValue) { nav.groupField = field }
+            it.state = (nav.groupField == field) ? .on : .off
+            groupMenu.addItem(it)
+        }
+        groupItem.submenu = groupMenu
+        menu.addItem(groupItem)
+
         menu.addItem(block("새로 고침", key: "r") { nav.reload() })
+
+        menu.addItem(.separator())
+
+        let undoItem = block(UndoService.shared.undoMenuTitle, key: "z") {
+            UndoService.shared.undo()
+        }
+        undoItem.isEnabled = UndoService.shared.canUndo
+        menu.addItem(undoItem)
 
         menu.addItem(.separator())
 
@@ -1506,6 +1774,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             }
         }
         if !created.isEmpty {
+            UndoService.shared.register(.create(urls: created), label: "바로 가기 만들기")
             parent.nav.reload(thenSelect: Set(created))
         }
         if let err = firstErr, created.isEmpty {
@@ -1543,6 +1812,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
                 if firstErr == nil { firstErr = error }
             }
         }
+        UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
         parent.nav.selectedItems.subtract(trashed)
         parent.nav.reload()
         if let err = firstErr {
@@ -1631,6 +1901,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         let url = unique("새 폴더", in: parent.nav.currentURL)
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
             parent.nav.reload(thenSelect: [url])
         } catch {
             alertError("폴더 만들기 실패", message: error.localizedDescription)
@@ -1643,6 +1914,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             alertError("파일 만들기 실패", message: "\(url.path) 에 파일을 만들 수 없습니다.")
             return
         }
+        UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
         parent.nav.reload(thenSelect: [url])
     }
 
