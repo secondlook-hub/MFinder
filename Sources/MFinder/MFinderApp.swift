@@ -42,6 +42,13 @@ struct MFinderApp: App {
                 Button("새 탭") {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
                 }.keyboardShortcut("t", modifiers: .command)
+                Divider()
+                // Finder-style 정보 가져오기: routed by focus area — the file
+                // list shows the selected item's 속성, the sidebar tree shows
+                // its own dialog (with async folder size).
+                Button("정보 가져오기") {
+                    NotificationCenter.default.post(name: .mfinderGetInfo, object: nil)
+                }.keyboardShortcut("i", modifiers: .command)
             }
             // Replace the system Close (⌘W): the menu bar resolves key
             // equivalents left-to-right, so the File menu's Close used to
@@ -137,6 +144,7 @@ extension Notification.Name {
     static let mfinderTreeCut           = Notification.Name("mfinder.treeCut")
     static let mfinderTreePaste         = Notification.Name("mfinder.treePaste")
     static let mfinderConnectToServer   = Notification.Name("mfinder.connectToServer")
+    static let mfinderGetInfo           = Notification.Name("mfinder.getInfo")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

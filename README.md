@@ -76,6 +76,9 @@ Requires **Swift 5.9** and **macOS 13.0 Ventura** or later.
 | Cmd+Up | Up one folder |
 | Space | Quick Look the selection |
 | F2 | Rename selected |
+| Cmd+I | Get Info (selected item, current folder, or sidebar folder) |
+| Cmd+Z / Shift+Cmd+Z | Undo / Redo file operations |
+| Shift+Cmd+P | Toggle Preview Pane |
 | Cmd+C | Copy selection |
 | Cmd+X | Cut selection |
 | Cmd+V | Paste from clipboard stack |

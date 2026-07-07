@@ -36,6 +36,18 @@ struct FileListView: View {
             guard AppFocus.area == .fileList else { return }
             trashSelected()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderGetInfo)) { _ in
+            // ⌘I — properties of the first selected item (list order), or of
+            // the current folder when nothing is selected. Skip when the
+            // sidebar tree has focus so its own handler (async folder size)
+            // can run.
+            guard AppFocus.area != .sidebar else { return }
+            if let item = nav.filteredItems.first(where: { nav.selectedItems.contains($0.url) }) {
+                showProperties(item)
+            } else {
+                showFolderProperties(nav.currentURL)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderEmptyTrash)) { _ in
             emptyTrash()
         }

@@ -626,6 +626,17 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         // MARK: - State synchronization
 
         func installObservers() {
+            // ⌘I (파일 → 정보 가져오기) while the sidebar tree has focus —
+            // show the tree's 속성 dialog (with async folder size) for the
+            // selection. The file list's own handler skips the sidebar case.
+            NotificationCenter.default.publisher(for: .mfinderGetInfo)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self, AppFocus.area == .sidebar else { return }
+                    let url = self.nav.sidebarSelectionURLs.first ?? self.nav.currentURL
+                    self.showProperties(for: url)
+                }
+                .store(in: &cancellables)
             // Reload structure whenever the tree's expansion / children change.
             tree.$expandedURLs
                 .receive(on: DispatchQueue.main)
