@@ -174,7 +174,12 @@ final class FileOperationService {
             if read == 0 { break }
             var written = 0
             while written < read {
-                let n = output.write(&buffer[written], maxLength: read - written)
+                // NOT `&buffer[written]` — inout-to-pointer on a single
+                // element passes a temporary, and OutputStream then writes
+                // garbage / EFAULTs. Offset from the real base address.
+                let n = buffer.withUnsafeBufferPointer { ptr in
+                    output.write(ptr.baseAddress! + written, maxLength: read - written)
+                }
                 if n <= 0 {
                     try? fm.removeItem(at: dst)
                     throw output.streamError ?? CocoaError(.fileWriteUnknown)
