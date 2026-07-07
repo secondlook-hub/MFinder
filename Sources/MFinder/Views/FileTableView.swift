@@ -1270,13 +1270,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
                 self?.openInEditor(target.url, bundleId: "com.microsoft.VSCode")
             })
             // Add/remove this folder from the sidebar's 즐겨찾기 section.
-            if PinnedFoldersService.shared.isPinned(target.url) {
+            // Built-in presets (바탕 화면 등) remove by hiding, not unpinning.
+            if PinnedFoldersService.shared.isInFavorites(target.url) {
                 menu.addItem(block("즐겨찾기에서 제거") {
-                    PinnedFoldersService.shared.unpin(target.url)
+                    PinnedFoldersService.shared.removeFromFavorites(target.url)
                 })
             } else {
                 menu.addItem(block("즐겨찾기에 추가") {
-                    PinnedFoldersService.shared.pin(target.url)
+                    PinnedFoldersService.shared.addToFavorites(target.url)
                 })
             }
         } else {

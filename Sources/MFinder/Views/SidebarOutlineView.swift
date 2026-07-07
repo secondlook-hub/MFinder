@@ -660,6 +660,16 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.applyState() }
                 .store(in: &cancellables)
+            // Hiding/restoring a built-in favorite rebuilds the section.
+            PinnedFoldersService.shared.$hiddenBuiltinPaths
+                .dropFirst()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self, let ov = self.outlineView else { return }
+                    ov.reloadItem(SidebarItem.section(.favorites), reloadChildren: true)
+                    ov.expandItem(SidebarItem.section(.favorites))
+                }
+                .store(in: &cancellables)
             ClipboardService.shared.$stack
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.applyState() }
@@ -1032,6 +1042,15 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             guard let node = ov.item(atRow: row) as? SidebarItem else { return }
             switch node {
             case .section(let s):
+                if s == .favorites {
+                    let hiddenCount = PinnedFoldersService.shared.hiddenBuiltinPaths.count
+                    if hiddenCount > 0 {
+                        menu.addItem(blockItem("숨긴 기본 항목 복원 (\(hiddenCount)개)") {
+                            PinnedFoldersService.shared.restoreAllBuiltins()
+                        })
+                        menu.addItem(.separator())
+                    }
+                }
                 if s == .network {
                     menu.addItem(blockItem("서버에 연결…") {
                         NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
@@ -1209,27 +1228,28 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             })
             menu.addItem(.separator())
             // Pinning: when multi-selected, decide by majority — if any of
-            // the selected URLs are already pinned, the menu offers "remove
-            // from favorites" for all of them; otherwise "add to favorites".
+            // the selected URLs are already in favorites, the menu offers
+            // "remove" for all of them; otherwise "add". Built-in presets
+            // (바탕 화면 등) remove by hiding, not unpinning.
             if isMulti {
-                let anyPinned = urls.contains(where: { PinnedFoldersService.shared.isPinned($0) })
-                if anyPinned {
+                let anyFavorite = urls.contains(where: { PinnedFoldersService.shared.isInFavorites($0) })
+                if anyFavorite {
                     menu.addItem(blockItem("즐겨찾기에서 제거 (\(urls.count)개)") {
-                        for u in urls { PinnedFoldersService.shared.unpin(u) }
+                        for u in urls { PinnedFoldersService.shared.removeFromFavorites(u) }
                     })
                 } else if isPinnable {
                     menu.addItem(blockItem("즐겨찾기에 추가 (\(urls.count)개)") {
-                        for u in urls { PinnedFoldersService.shared.pin(u) }
+                        for u in urls { PinnedFoldersService.shared.addToFavorites(u) }
                     })
                 }
             } else {
-                if PinnedFoldersService.shared.isPinned(url) {
+                if PinnedFoldersService.shared.isInFavorites(url) {
                     menu.addItem(blockItem("즐겨찾기에서 제거") {
-                        PinnedFoldersService.shared.unpin(url)
+                        PinnedFoldersService.shared.removeFromFavorites(url)
                     })
                 } else if isPinnable {
                     menu.addItem(blockItem("즐겨찾기에 추가") {
-                        PinnedFoldersService.shared.pin(url)
+                        PinnedFoldersService.shared.addToFavorites(url)
                     })
                 }
             }

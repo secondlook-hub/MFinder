@@ -24,7 +24,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Send To** — 바탕 화면 (바로 가기), 다운로드, 문서, AirDrop, 메일, 메시지
 - **Trash / Delete** — ⌫ or ⌘⌫ moves to Trash via Finder (recoverable), ⌥⌘⌫ deletes immediately with confirmation, ⌘⇧⌫ empties the entire Trash
 - **Tab Bar** — Drag tabs to reorder; close-other-tabs from the context menu; tabs share the sidebar tree state
-- **Pinned Favorites** — Add any folder to the 즐겨찾기 sidebar section via the right-click menu in either the sidebar tree or the file list ("즐겨찾기에 추가" / "즐겨찾기에서 제거")
+- **Pinned Favorites** — Add any folder to the 즐겨찾기 sidebar section via the right-click menu in either the sidebar tree or the file list ("즐겨찾기에 추가" / "즐겨찾기에서 제거"). The built-in presets (바탕 화면/다운로드/문서/사진/음악/동영상) are removable too, Explorer-style; right-click the 즐겨찾기 section header to restore hidden presets
 - **Permission Guidance** — TCC-protected folders (OneDrive / Google Drive / Dropbox under `~/Library/CloudStorage`) trigger a clear dialog with a one-click jump to System Settings → Privacy & Security → Full Disk Access
 - **Symlink Creation** — "바로 가기 만들기" creates a Finder-style alias (POSIX symlink) next to the source folder
 - **File Properties** — 속성 dialog on file-list items (size, type, dates, permissions) and on sidebar tree folders (만든/수정 날짜 + async-computed total size)

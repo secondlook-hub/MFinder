@@ -267,8 +267,11 @@ final class FileSystemService {
             QuickAccessItem(name: "음악",         url: home.appendingPathComponent("Music"),       systemSymbol: "music.note",             isPinned: false),
             QuickAccessItem(name: "동영상",       url: home.appendingPathComponent("Movies"),      systemSymbol: "film",                   isPinned: false)
         ]
-        // Append user-pinned folders. Deduplicated against the built-ins above.
+        // Built-ins the user removed (Explorer-style) are filtered out; the
+        // 즐겨찾기 section's right-click menu restores them.
         let builtInPaths = Set(items.map { $0.url.standardizedFileURL.path })
+        items.removeAll { PinnedFoldersService.shared.isBuiltinHidden($0.url) }
+        // Append user-pinned folders. Deduplicated against the built-ins above.
         for url in PinnedFoldersService.shared.pinnedURLs {
             let std = url.standardizedFileURL
             guard !builtInPaths.contains(std.path) else { continue }
