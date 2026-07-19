@@ -92,7 +92,7 @@ private struct TabContent: View {
         VStack(spacing: 0) {
             AddressBar()
             CommandBar()
-            HSplitView {
+            HStack(spacing: 0) {
                 // Tag with the active tab's object identity so the entire
                 // sidebar (NSOutlineView + Coordinator + Combine
                 // subscriptions) is torn down and rebuilt against the new
@@ -100,14 +100,22 @@ private struct TabContent: View {
                 // Without this, the Coordinator keeps observing the
                 // previous tab's nav and the tree never moves to the new
                 // tab's currentURL.
+                //
+                // That rebuild is also why the sidebar sits in an HStack at an
+                // explicit width instead of being an HSplitView pane: a
+                // re-inserted subview gets laid out fresh at its idealWidth,
+                // so a user-dragged pane width would be dropped every time.
                 SidebarView()
                     .id(ObjectIdentifier(tab))
-                    .frame(minWidth: 160, idealWidth: 240, maxWidth: 400)
-                FileListView()
-                    .frame(minWidth: 400)
-                if uiState.showPreviewPane {
-                    PreviewPane()
-                        .frame(minWidth: 200, idealWidth: 300, maxWidth: 520)
+                    .frame(width: uiState.sidebarWidth)
+                SidebarResizeDivider()
+                HSplitView {
+                    FileListView()
+                        .frame(minWidth: 400)
+                    if uiState.showPreviewPane {
+                        PreviewPane()
+                            .frame(minWidth: 200, idealWidth: 300, maxWidth: 520)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -117,5 +125,36 @@ private struct TabContent: View {
             tab.tree.ensureVisible(newURL)
             tab.tree.reloadChildren(of: newURL.deletingLastPathComponent())
         }
+    }
+}
+
+/// Drag handle between the sidebar and the file list. Replaces HSplitView's
+/// built-in divider so the resulting width can live in AppUIState (and thus
+/// survive sidebar rebuilds and relaunches).
+private struct SidebarResizeDivider: View {
+    @ObservedObject private var uiState = AppUIState.shared
+    /// Width at the moment the drag began — DragGesture reports cumulative
+    /// translation, so tracking against a fixed origin avoids compounding.
+    @State private var dragStartWidth: CGFloat?
+
+    var body: some View {
+        Divider()
+            // A 1pt divider is too thin to grab; widen only the hit area.
+            .overlay(Color.clear.frame(width: 8).contentShape(Rectangle()))
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let start = dragStartWidth ?? uiState.sidebarWidth
+                        if dragStartWidth == nil { dragStartWidth = start }
+                        uiState.sidebarWidth = min(
+                            max(start + value.translation.width, AppUIState.minSidebarWidth),
+                            AppUIState.maxSidebarWidth
+                        )
+                    }
+                    .onEnded { _ in dragStartWidth = nil }
+            )
     }
 }

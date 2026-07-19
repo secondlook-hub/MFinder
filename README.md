@@ -35,7 +35,8 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Font Size** — Adjustable base font size (10–18pt) for the details table, list/icon modes, and sidebar tree via 설정 slider or 보기 → 글자 크게/작게/기본 (⌘= / ⌘- / ⌘0); row heights follow
 - **Overwrite Prompt** — Pasting or dropping over a same-named item asks 덮어쓰기 / 건너뛰기 / 취소 per conflict, with an "apply to remaining conflicts" checkbox for bulk answers. Cancelling a paste keeps the unpasted entries in the clipboard stack
 - **Mouse Back/Forward Buttons** — Side buttons on mice like the Logitech MX Master navigate folder history, browser-style
-- **Custom Columns** — Right-click the details-view header to show/hide 수정한 날짜 / 유형 / 크기 / 만든 날짜 / 확장명 columns, Explorer-style; every column sorts
+- **Custom Columns** — Right-click the details-view header to show/hide 수정한 날짜 / 유형 / 크기 / 만든 날짜 / 확장명 columns, Explorer-style; every column sorts. Drag headers to reorder and drag their edges to resize — both persist across relaunches, hidden columns included
+- **Persistent Sidebar Width** — Drag the divider between the tree and the file list; the width sticks across tab switches, app re-activation, and relaunches
 - **Async Copy/Move with Progress** — Paste and drag-drop run in the background with an Explorer-style progress panel (current item, N/M counter, byte-accurate bar, cancel); the UI never freezes on multi-GB copies
 - **Undo / Redo (⌘Z / ⇧⌘Z)** — Reverts paste, drag move/copy, rename (single + batch), 새로 만들기, 바로 가기 만들기, and 휴지통 이동 (restores from the Trash), up to 50 steps
 - **Group By** — 그룹화 기준 in the details view: 이름 / 수정한 날짜(오늘·어제·이번 주…) / 유형 / 크기 buckets / 만든 날짜 / 확장명, with item counts per group header

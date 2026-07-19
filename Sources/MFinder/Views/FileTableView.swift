@@ -68,6 +68,11 @@ struct FileTableView: NSViewRepresentable {
         tableView.headerView?.menu = headerMenu
         context.coordinator.headerMenu = headerMenu
 
+        // Restore the user's header-drag order and column widths. Done before
+        // the delegate is attached so the moveColumn calls below don't bounce
+        // back through tableViewColumnDidMove and re-save what we just read.
+        restoreColumnLayout(on: tableView)
+
         tableView.dataSource = context.coordinator
         tableView.delegate = context.coordinator
 
@@ -97,6 +102,26 @@ struct FileTableView: NSViewRepresentable {
         col.maxWidth = maxWidth
         col.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: true)
         tableView.addTableColumn(col)
+    }
+
+    /// Applies the persisted column order + widths. Saved ids are pulled to the
+    /// front in stored order; anything unknown (a column added in a later
+    /// version) keeps its relative position at the tail.
+    private func restoreColumnLayout(on tableView: NSTableView) {
+        let widths = PreferencesService.shared.detailColumnWidths
+        for col in tableView.tableColumns {
+            guard let w = widths[col.identifier.rawValue] else { continue }
+            col.width = min(max(CGFloat(w), col.minWidth), col.maxWidth)
+        }
+
+        var target = 0
+        for id in PreferencesService.shared.detailColumnOrder {
+            guard let idx = tableView.tableColumns.firstIndex(where: {
+                $0.identifier.rawValue == id
+            }) else { continue }
+            if idx != target { tableView.moveColumn(idx, toColumn: target) }
+            target += 1
+        }
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
@@ -1239,6 +1264,26 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         visible.removeAll { $0 == id }
         if !col.isHidden { visible.append(id) }
         PreferencesService.shared.detailColumns = visible
+    }
+
+    // MARK: header layout persistence (drag-to-reorder + resize)
+
+    func tableViewColumnDidMove(_ notification: Notification) {
+        saveColumnLayout()
+    }
+
+    func tableViewColumnDidResize(_ notification: Notification) {
+        saveColumnLayout()
+    }
+
+    /// Snapshots the live header layout. Hidden columns are included so a
+    /// column toggled back on later lands where the user last left it.
+    private func saveColumnLayout() {
+        guard let tv = tableView else { return }
+        PreferencesService.shared.detailColumnOrder = tv.tableColumns.map { $0.identifier.rawValue }
+        var widths: [String: Double] = [:]
+        for col in tv.tableColumns { widths[col.identifier.rawValue] = Double(col.width) }
+        PreferencesService.shared.detailColumnWidths = widths
     }
 
     // MARK: file menu
