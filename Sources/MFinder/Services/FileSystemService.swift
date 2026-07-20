@@ -353,16 +353,28 @@ final class FileSystemService {
         return items
     }
 
-    /// Every path that appears as a top-level row under a sidebar section.
-    /// `FolderTreeStore.ensureVisible` stops climbing here so a folder is
-    /// revealed under the section it belongs to instead of being re-rooted
-    /// through 내 PC → 홈.
-    func sidebarRootPaths() -> Set<String> {
-        var paths = Set<String>()
+    /// The sidebar top-level row `url` should be revealed under: the most
+    /// specific root that contains it.
+    ///
+    /// Specificity matters because roots nest — `~/Desktop/A` sits under
+    /// 즐겨찾기 → 바탕 화면, under 내 PC → 홈, and under 로컬 디스크 (C:) all at
+    /// once. The longest match is the row that owns it most directly, so
+    /// `FolderTreeStore.ensureVisible` grows the shortest branch instead of
+    /// re-rooting the folder through 내 PC → 홈. Returns nil only for paths
+    /// outside every root (an unmounted volume, say), where there is no row to
+    /// reveal.
+    func sidebarRoot(for url: URL) -> URL? {
+        let target = url.standardizedFileURL.path
+        var best: URL?
+        var bestLength = -1
         for item in quickAccessLocations() + thisPCLocations() + cloudLocations() {
-            paths.insert(item.url.standardizedFileURL.path)
+            let root = item.url.standardizedFileURL.path
+            let contains = target == root || target.hasPrefix(root == "/" ? "/" : root + "/")
+            guard contains, root.count > bestLength else { continue }
+            bestLength = root.count
+            best = item.url
         }
-        return paths
+        return best
     }
 
     /// Cloud provider roots — OneDrive / Google Drive / Dropbox / Box etc.

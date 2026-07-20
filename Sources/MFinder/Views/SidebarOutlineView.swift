@@ -16,7 +16,12 @@ enum SidebarItem: Hashable {
     /// Just a local directory published by the provider's File Provider
     /// extension — see FileSystemService.cloudLocations().
     case cloudRoot(QuickAccessItem)
-    case folder(URL)
+    /// A folder inside a section's branch. `root` is the top-level row the
+    /// branch hangs off, and it is part of the item's identity: the same
+    /// directory shown under two sections must be two distinct items, or
+    /// AppKit — which compares sidebar items by value — treats the rows as one
+    /// and expands/scrolls to whichever it finds first.
+    case folder(URL, root: URL)
     /// A remote server entry under the 네트워크 section. The URL is the
     /// server address (e.g. `smb://server/share`), not a local mount point.
     case server(URL)
@@ -35,9 +40,25 @@ enum SidebarItem: Hashable {
     var folderURL: URL? {
         switch self {
         case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa): return qa.url
-        case .folder(let url): return url
+        case .folder(let url, _): return url
         case .section, .server, .connectAction, .airdrop: return nil
         }
+    }
+
+    /// Top-level sidebar row this item's branch hangs off. A root row is its
+    /// own root.
+    var rootURL: URL? {
+        switch self {
+        case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa): return qa.url
+        case .folder(_, let root): return root
+        case .section, .server, .connectAction, .airdrop: return nil
+        }
+    }
+
+    /// Branch-aware key into `FolderTreeStore`'s expansion state.
+    var treeNode: TreeNode? {
+        guard let url = folderURL, let root = rootURL else { return nil }
+        return TreeNode(root: root, url: url)
     }
 
     var isSection: Bool {
@@ -163,7 +184,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         private var cancellables: Set<AnyCancellable> = []
         private var syncedCurrentPath: String = ""
-        private var syncedExpanded: Set<URL> = []
+        private var syncedExpanded: Set<TreeNode> = []
         private var syncedChildrenCache: [URL: [URL]] = [:]
         private var syncedPinnedURLs: [URL] = []
         private var syncedRenamingURL: URL?
@@ -239,10 +260,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 }
             case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 let kids = tree.children(of: qa.url) ?? []
-                return kids.map { .folder($0) }
-            case .folder(let url):
+                return kids.map { .folder($0, root: qa.url) }
+            case .folder(let url, let root):
                 let kids = tree.children(of: url) ?? []
-                return kids.map { .folder($0) }
+                return kids.map { .folder($0, root: root) }
             case .server, .connectAction, .airdrop:
                 return []
             }
@@ -269,7 +290,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return true
             case .favoriteRoot, .pcRoot, .cloudRoot:
                 return true   // optimistic; chevron disappears on actual empty load
-            case .folder(let url):
+            case .folder(let url, _):
                 if let cached = tree.children(of: url) {
                     return !cached.isEmpty
                 }
@@ -292,7 +313,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return makeQuickAccessCell(qa: qa, isPinned: false)
             case .cloudRoot(let qa):
                 return makeCloudCell(qa: qa)
-            case .folder(let url):
+            case .folder(let url, _):
                 return makeFolderCell(url: url)
             case .server(let server):
                 return makeServerCell(server: server)
@@ -322,8 +343,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             // Load children synchronously *before* AppKit asks the data
             // source how many to display, so the expanded view shows the
             // correct rows on first paint instead of an empty branch.
-            if let node = item as? SidebarItem, let url = node.folderURL {
-                tree.expand(url)
+            if let node = item as? SidebarItem, let treeNode = node.treeNode {
+                tree.expand(treeNode)
             }
             return true
         }
@@ -346,17 +367,24 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             guard ov.selectedRowIndexes.count == 1,
                   let row = ov.selectedRowIndexes.first,
                   let node = ov.item(atRow: row) as? SidebarItem else { return }
+            // Clicking a row is what declares which branch the user is working
+            // in. Record it *before* navigating, so the reveal that navigate()
+            // kicks off grows this branch rather than the other section showing
+            // the same folder.
+            if let root = node.rootURL {
+                tree.activeRoot = root
+            }
             switch node {
             case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 if nav.currentURL.standardizedFileURL.path != qa.url.standardizedFileURL.path {
                     nav.navigate(to: qa.url)
                 }
-                tree.expand(qa.url)
-            case .folder(let url):
+                if let treeNode = node.treeNode { tree.expand(treeNode) }
+            case .folder(let url, _):
                 if nav.currentURL.standardizedFileURL.path != url.standardizedFileURL.path {
                     nav.navigate(to: url)
                 }
-                tree.expand(url)
+                if let treeNode = node.treeNode { tree.expand(treeNode) }
             case .server(let server):
                 // Only navigate when already mounted; an unmounted server row
                 // sits selected silently and waits for an explicit 연결 from
@@ -410,15 +438,15 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         func outlineViewItemDidExpand(_ notification: Notification) {
             guard let item = notification.userInfo?["NSObject"] as? SidebarItem else { return }
-            if let url = item.folderURL {
-                tree.expand(url)
+            if let node = item.treeNode {
+                tree.expand(node)
             }
         }
 
         func outlineViewItemDidCollapse(_ notification: Notification) {
             guard let item = notification.userInfo?["NSObject"] as? SidebarItem else { return }
-            if let url = item.folderURL {
-                tree.collapse(url)
+            if let node = item.treeNode {
+                tree.collapse(node)
             }
         }
 
@@ -665,7 +693,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 }
                 .store(in: &cancellables)
             // Reload structure whenever the tree's expansion / children change.
-            tree.$expandedURLs
+            tree.$expandedNodes
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.applyState() }
                 .store(in: &cancellables)
@@ -759,7 +787,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             }
 
             let childrenChanged = syncedChildrenCache != tree.childrenCache
-            let expansionChanged = syncedExpanded != tree.expandedURLs
+            let expansionChanged = syncedExpanded != tree.expandedNodes
             let pinnedChanged = syncedPinnedURLs != PinnedFoldersService.shared.pinnedURLs
 
             // Pinning / unpinning a folder updates the favorites section
@@ -778,36 +806,36 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 ov.expandItem(SidebarItem.section(.favorites))
                 ov.expandItem(SidebarItem.section(.thisPC))
                 ov.expandItem(SidebarItem.section(.cloud))
-                // Re-expand all known expanded URLs. Sort by depth so each
+                // Re-expand every known expanded node. Sort by depth so each
                 // parent is expanded before its children are looked up.
-                let urls = tree.expandedURLs.sorted {
-                    $0.pathComponents.count < $1.pathComponents.count
+                let nodes = tree.expandedNodes.sorted {
+                    $0.url.pathComponents.count < $1.url.pathComponents.count
                 }
-                for url in urls {
-                    if let item = locateItem(for: url) {
+                for node in nodes {
+                    if let item = locateNode(node) {
                         ov.expandItem(item)
                     }
                 }
                 ov.endUpdates()
-                syncedExpanded = tree.expandedURLs
+                syncedExpanded = tree.expandedNodes
                 syncedChildrenCache = tree.childrenCache
             } else if !isRenameActive && expansionChanged {
                 // Cheap path: only expansion set changed (programmatic
                 // navigation expanded ancestors via tree.ensureVisible).
                 // Apply diffs without reloading data.
-                let added = tree.expandedURLs.subtracting(syncedExpanded)
-                let removed = syncedExpanded.subtracting(tree.expandedURLs)
-                for url in added.sorted(by: { $0.pathComponents.count < $1.pathComponents.count }) {
-                    if let item = locateItem(for: url), !ov.isItemExpanded(item) {
+                let added = tree.expandedNodes.subtracting(syncedExpanded)
+                let removed = syncedExpanded.subtracting(tree.expandedNodes)
+                for node in added.sorted(by: { $0.url.pathComponents.count < $1.url.pathComponents.count }) {
+                    if let item = locateNode(node), !ov.isItemExpanded(item) {
                         ov.expandItem(item)
                     }
                 }
-                for url in removed {
-                    if let item = locateItem(for: url), ov.isItemExpanded(item) {
+                for node in removed {
+                    if let item = locateNode(node), ov.isItemExpanded(item) {
                         ov.collapseItem(item)
                     }
                 }
-                syncedExpanded = tree.expandedURLs
+                syncedExpanded = tree.expandedNodes
             }
 
             syncSelection()
@@ -835,11 +863,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             syncedCurrentPath = curPath
             // A row the user already selected wins over locateItem's ranking.
             // The same folder can sit under two sections (내 PC → 홈 → Desktop
-            // *and* 즐겨찾기 → 바탕 화면); locateItem always returns the copy
-            // reached through the most specific root, which would yank the
-            // highlight over to 즐겨찾기 even when 내 PC is the row that was
-            // clicked. Ranking is only meant to break ties for *programmatic*
-            // reveals, not to overrule an explicit click.
+            // *and* 즐겨찾기 → 바탕 화면), and ranking is only meant to break
+            // ties for *programmatic* reveals, never to overrule a click.
             for idx in ov.selectedRowIndexes {
                 guard let node = ov.item(atRow: idx) as? SidebarItem,
                       let url = node.folderURL,
@@ -864,42 +889,41 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         // MARK: - URL → outline item resolution
 
-        /// Find the SidebarItem currently shown that matches the given URL.
-        /// First match priority: an existing `.folder(url)` row anywhere in
-        /// the visible outline; otherwise a top-level favorite / pcRoot
-        /// whose URL matches.
-        /// Finds the row for `url`, preferring the one reached through the most
-        /// specific sidebar root.
+        /// The row for an exact branch node. Unambiguous — a `TreeNode` names
+        /// both the folder and the section root it hangs off — so this is what
+        /// the expansion sync uses; nothing about it can move the tree to a
+        /// different section.
+        func locateNode(_ node: TreeNode) -> SidebarItem? {
+            guard let ov = outlineView else { return nil }
+            for i in 0..<ov.numberOfRows {
+                guard let item = ov.item(atRow: i) as? SidebarItem,
+                      item.treeNode == node else { continue }
+                return item
+            }
+            return nil
+        }
+
+        /// Find a row for a bare URL, used where the caller has no branch in
+        /// hand (selection following `nav.currentURL`, rename targets).
         ///
         /// The same folder can appear under several sections — a OneDrive
         /// subfolder is a child of its 클라우드 root *and* of 내 PC → 홈 →
         /// Library → CloudStorage if the user expanded that chain by hand.
-        /// Taking the first row in display order would hand back the 내 PC copy
-        /// (that section sits higher), yanking the tree out of 클라우드. Ranking
-        /// by root-path length picks the section that owns the folder most
-        /// directly, which also keeps 즐겨찾기 → 바탕 화면 winning over
+        /// The branch the user is working in wins; failing that, the most
+        /// specific root, which keeps 즐겨찾기 → 바탕 화면 ahead of
         /// 내 PC → 홈 → Desktop.
         func locateItem(for url: URL) -> SidebarItem? {
             guard let ov = outlineView else { return nil }
             let target = url.standardizedFileURL.path
+            let activeRootPath = tree.activeRoot?.standardizedFileURL.path
             var best: SidebarItem?
             var bestRootLength = -1
             for i in 0..<ov.numberOfRows {
                 guard let node = ov.item(atRow: i) as? SidebarItem,
                       let nodeURL = node.folderURL,
                       nodeURL.standardizedFileURL.path == target else { continue }
-                // Climb to the topmost non-section ancestor — that row is the
-                // section root this match hangs off.
-                var rootPath = nodeURL.standardizedFileURL.path
-                var cursor: Any = node
-                while let parent = ov.parent(forItem: cursor),
-                      let parentNode = parent as? SidebarItem,
-                      !parentNode.isSection {
-                    cursor = parent
-                    if let u = parentNode.folderURL {
-                        rootPath = u.standardizedFileURL.path
-                    }
-                }
+                let rootPath = (node.rootURL ?? nodeURL).standardizedFileURL.path
+                if rootPath == activeRootPath { return node }
                 if rootPath.count > bestRootLength {
                     bestRootLength = rootPath.count
                     best = node
@@ -1144,7 +1168,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 })
             case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 buildItemMenu(menu, url: qa.url, isFolder: true, isPinnable: true)
-            case .folder(let url):
+            case .folder(let url, _):
                 buildItemMenu(menu, url: url, isFolder: true, isPinnable: true)
             case .server(let server):
                 buildServerMenu(menu, server: server)

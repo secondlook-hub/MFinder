@@ -1,11 +1,43 @@
 import Foundation
 import SwiftUI
 
+/// Identity of one row in the sidebar tree: a folder *as reached through a
+/// particular section root*.
+///
+/// The same directory can hang off two roots — `~/Desktop` is both
+/// 즐겨찾기 → 바탕 화면 and 내 PC → 홈 → Desktop. Keying expansion by URL
+/// alone made those two rows share one flag, so expanding either expanded
+/// both, and AppKit (which compares sidebar items by value) resolved
+/// `row(forItem:)` to whichever came first in display order — scrolling the
+/// tree up to 즐겨찾기 while the user was working down in 내 PC.
+struct TreeNode: Hashable {
+    let root: URL
+    let url: URL
+
+    /// Both components are canonicalized on the way in, so a node built from
+    /// `contentsOfDirectory` output matches one built from a resolved path.
+    init(root: URL, url: URL) {
+        self.root = URL(fileURLWithPath: root.standardizedFileURL.path, isDirectory: true)
+        self.url  = URL(fileURLWithPath: url.standardizedFileURL.path,  isDirectory: true)
+    }
+}
+
 @MainActor
 final class FolderTreeStore: ObservableObject {
+    /// Per-branch expansion — the authority for what the sidebar draws.
+    @Published private(set) var expandedNodes: Set<TreeNode> = []
+    /// Every distinct URL in `expandedNodes`, kept in sync on each mutation.
+    /// The FSEvents watch set and `reloadChildren` are branch-agnostic: one
+    /// directory is watched once no matter how many rows show it.
     @Published private(set) var expandedURLs: Set<URL> = []
     @Published private(set) var childrenCache: [URL: [URL]] = [:]
     @Published private(set) var loadingURLs: Set<URL> = []
+
+    /// Section root the user is currently working in, set by the sidebar when
+    /// its selection changes. A reveal prefers this branch whenever the target
+    /// lives under it, so walking deeper from 내 PC → 홈 → Desktop grows *that*
+    /// branch instead of jumping to the 즐겨찾기 copy of the same folder.
+    var activeRoot: URL?
 
     /// Canonical directory-URL form used as the key everywhere in this store.
     /// `URL(fileURLWithPath: _, isDirectory: true)` ensures consistent trailing
@@ -15,39 +47,52 @@ final class FolderTreeStore: ObservableObject {
         URL(fileURLWithPath: url.standardizedFileURL.path, isDirectory: true)
     }
 
+    /// True when *any* branch shows this directory expanded — the question the
+    /// file-system watcher asks.
     func isExpanded(_ url: URL) -> Bool {
         expandedURLs.contains(canonical(url))
+    }
+
+    func isExpanded(_ node: TreeNode) -> Bool {
+        expandedNodes.contains(node)
     }
 
     func children(of url: URL) -> [URL]? {
         childrenCache[canonical(url)]
     }
 
-    func toggle(_ url: URL) {
-        let std = canonical(url)
-        if expandedURLs.contains(std) {
-            expandedURLs.remove(std)
+    func toggle(_ node: TreeNode) {
+        if expandedNodes.contains(node) {
+            collapse(node)
         } else {
-            expand(std)
+            expand(node)
         }
     }
 
-    func expand(_ url: URL) {
-        let std = canonical(url)
+    func expand(_ node: TreeNode) {
         // Idempotent — re-insert into a @Published Set still fires
         // objectWillChange and invalidates every row in the tree (a single
         // unnecessary one is enough to drop focus from an active inline
         // rename). Only mutate when state actually changes.
-        if !expandedURLs.contains(std) {
-            expandedURLs.insert(std)
+        if !expandedNodes.contains(node) {
+            expandedNodes.insert(node)
+            syncExpandedURLs()
         }
-        if childrenCache[std] == nil {
-            loadChildren(of: std)
+        if childrenCache[node.url] == nil {
+            loadChildren(of: node.url)
         }
     }
 
-    func collapse(_ url: URL) {
-        expandedURLs.remove(canonical(url))
+    func collapse(_ node: TreeNode) {
+        guard expandedNodes.remove(node) != nil else { return }
+        syncExpandedURLs()
+    }
+
+    private func syncExpandedURLs() {
+        let urls = Set(expandedNodes.map(\.url))
+        if expandedURLs != urls {
+            expandedURLs = urls
+        }
     }
 
     func reloadChildren(of url: URL) {
@@ -67,35 +112,50 @@ final class FolderTreeStore: ObservableObject {
     /// `~/Library`) into their parent's children cache — otherwise the chain
     /// breaks because `loadChildren` defaults to skipping hidden files.
     ///
-    /// Walking stops at the first sidebar root reached (see
-    /// `FileSystemService.sidebarRootPaths()`), rather than continuing to `/`.
-    /// A OneDrive folder lives at `~/Library/CloudStorage/OneDrive-…/`, which
-    /// is reachable *both* from its 클라우드 root and from 내 PC → 홈 → Library.
-    /// Expanding all the way up materializes that second chain, and since 내 PC
-    /// sits above 클라우드 in the sidebar, the tree would then select the 내 PC
-    /// copy and visibly drag the user out of the section they were browsing.
-    func ensureVisible(_ target: URL, stoppingAt roots: Set<String> = []) {
+    /// The walk happens inside exactly one branch and stops at that branch's
+    /// root, rather than continuing to `/`. Which branch is decided by
+    /// `revealRoot(for:)`: the section the user is already working in when the
+    /// target lives under it, otherwise the most specific sidebar root that
+    /// contains it. Expanding all the way to `/` would materialize the folder's
+    /// *other* home (a OneDrive folder is reachable both from its 클라우드 root
+    /// and via 내 PC → 홈 → Library) and drag the tree out of the section the
+    /// user was browsing.
+    ///
+    /// A target that is itself a root needs no reveal — it already has a
+    /// top-level row.
+    func ensureVisible(_ target: URL) {
         let targetURL = canonical(target)
-        // The target *is* a sidebar root — 즐겨찾기 → 바탕 화면, a 클라우드
-        // provider, a 내 PC entry. It already has its own top-level row, so
-        // there is nothing to reveal. Climbing even one level would expand the
-        // other place the same folder lives (`~/Desktop` is both 즐겨찾기 →
-        // 바탕 화면 and 내 PC → 홈 → Desktop), materializing the whole 홈 branch
-        // and dragging the tree out of the section the user clicked in.
-        guard !roots.contains(targetURL.standardizedFileURL.path) else { return }
+        guard let root = revealRoot(for: targetURL),
+              root.path != targetURL.path else { return }
         var current = targetURL.deletingLastPathComponent()
         var child = targetURL
         var safety = 0
         while safety < 64 {
             safety += 1
-            expand(current)
+            expand(TreeNode(root: root, url: current))
             ensureChildIncluded(child, of: current)
-            if roots.contains(current.standardizedFileURL.path) { break }
+            if current.path == root.path { break }
             let parent = current.deletingLastPathComponent()
             if parent.path == current.path { break }
             child = current
             current = parent
         }
+    }
+
+    /// Branch to reveal `target` in. Prefers `activeRoot` so a reveal never
+    /// yanks the user into a different section showing the same folder.
+    private func revealRoot(for target: URL) -> URL? {
+        if let active = activeRoot.map(canonical), contains(active, target) {
+            return active
+        }
+        return FileSystemService.shared.sidebarRoot(for: target).map(canonical)
+    }
+
+    private func contains(_ root: URL, _ target: URL) -> Bool {
+        let rootPath = root.path
+        let targetPath = target.path
+        if rootPath == targetPath { return true }
+        return targetPath.hasPrefix(rootPath == "/" ? "/" : rootPath + "/")
     }
 
     /// If `child` is a real folder but missing from `parent`'s children cache
