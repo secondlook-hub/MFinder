@@ -76,6 +76,13 @@ final class FolderTreeStore: ObservableObject {
     /// copy and visibly drag the user out of the section they were browsing.
     func ensureVisible(_ target: URL, stoppingAt roots: Set<String> = []) {
         let targetURL = canonical(target)
+        // The target *is* a sidebar root — 즐겨찾기 → 바탕 화면, a 클라우드
+        // provider, a 내 PC entry. It already has its own top-level row, so
+        // there is nothing to reveal. Climbing even one level would expand the
+        // other place the same folder lives (`~/Desktop` is both 즐겨찾기 →
+        // 바탕 화면 and 내 PC → 홈 → Desktop), materializing the whole 홈 branch
+        // and dragging the tree out of the section the user clicked in.
+        guard !roots.contains(targetURL.standardizedFileURL.path) else { return }
         var current = targetURL.deletingLastPathComponent()
         var child = targetURL
         var safety = 0

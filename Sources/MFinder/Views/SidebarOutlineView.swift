@@ -833,6 +833,20 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             let curPath = nav.currentURL.standardizedFileURL.path
             guard curPath != syncedCurrentPath else { return }
             syncedCurrentPath = curPath
+            // A row the user already selected wins over locateItem's ranking.
+            // The same folder can sit under two sections (내 PC → 홈 → Desktop
+            // *and* 즐겨찾기 → 바탕 화면); locateItem always returns the copy
+            // reached through the most specific root, which would yank the
+            // highlight over to 즐겨찾기 even when 내 PC is the row that was
+            // clicked. Ranking is only meant to break ties for *programmatic*
+            // reveals, not to overrule an explicit click.
+            for idx in ov.selectedRowIndexes {
+                guard let node = ov.item(atRow: idx) as? SidebarItem,
+                      let url = node.folderURL,
+                      url.standardizedFileURL.path == curPath else { continue }
+                ov.scrollRowToVisible(idx)
+                return
+            }
             if let item = locateItem(for: nav.currentURL), let row = rowIndex(for: item) {
                 // Preserve a user-built multi-selection if it already
                 // contains the new currentURL — only the visible scroll
