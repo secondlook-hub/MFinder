@@ -353,26 +353,34 @@ final class FileSystemService {
         return items
     }
 
-    /// The sidebar top-level row `url` should be revealed under: the most
-    /// specific root that contains it.
+    /// The sidebar branch `url` should be revealed in: the most specific root
+    /// that contains it, tagged with the section it lives in.
     ///
     /// Specificity matters because roots nest — `~/Desktop/A` sits under
     /// 즐겨찾기 → 바탕 화면, under 내 PC → 홈, and under 로컬 디스크 (C:) all at
     /// once. The longest match is the row that owns it most directly, so
     /// `FolderTreeStore.ensureVisible` grows the shortest branch instead of
-    /// re-rooting the folder through 내 PC → 홈. Returns nil only for paths
-    /// outside every root (an unmounted volume, say), where there is no row to
-    /// reveal.
-    func sidebarRoot(for url: URL) -> URL? {
+    /// re-rooting the folder through 내 PC → 홈. 즐겨찾기 is scanned first so a
+    /// root pinned there wins the tie against its 클라우드 twin at the same
+    /// path. Returns nil only for paths outside every root (an unmounted
+    /// volume, say), where there is no row to reveal.
+    func sidebarBranch(for url: URL) -> TreeBranch? {
         let target = url.standardizedFileURL.path
-        var best: URL?
+        let candidates: [(SidebarBranchKind, [QuickAccessItem])] = [
+            (.favorites, quickAccessLocations()),
+            (.cloud,     cloudLocations()),
+            (.thisPC,    thisPCLocations())
+        ]
+        var best: TreeBranch?
         var bestLength = -1
-        for item in quickAccessLocations() + thisPCLocations() + cloudLocations() {
-            let root = item.url.standardizedFileURL.path
-            let contains = target == root || target.hasPrefix(root == "/" ? "/" : root + "/")
-            guard contains, root.count > bestLength else { continue }
-            bestLength = root.count
-            best = item.url
+        for (kind, items) in candidates {
+            for item in items {
+                let root = item.url.standardizedFileURL.path
+                let contains = target == root || target.hasPrefix(root == "/" ? "/" : root + "/")
+                guard contains, root.count > bestLength else { continue }
+                bestLength = root.count
+                best = TreeBranch(kind: kind, root: item.url)
+            }
         }
         return best
     }

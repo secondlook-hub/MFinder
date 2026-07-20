@@ -16,12 +16,14 @@ enum SidebarItem: Hashable {
     /// Just a local directory published by the provider's File Provider
     /// extension — see FileSystemService.cloudLocations().
     case cloudRoot(QuickAccessItem)
-    /// A folder inside a section's branch. `root` is the top-level row the
-    /// branch hangs off, and it is part of the item's identity: the same
-    /// directory shown under two sections must be two distinct items, or
+    /// A folder inside a section's branch. `branch` names the top-level row it
+    /// hangs off *and* that row's section, and is part of the item's identity:
+    /// the same directory shown in two places must be two distinct items, or
     /// AppKit — which compares sidebar items by value — treats the rows as one
-    /// and expands/scrolls to whichever it finds first.
-    case folder(URL, root: URL)
+    /// and expands/scrolls to whichever it finds first. The section matters on
+    /// its own because a 클라우드 root added to 즐겨찾기 heads two branches at
+    /// the identical path.
+    case folder(URL, branch: TreeBranch)
     /// A remote server entry under the 네트워크 section. The URL is the
     /// server address (e.g. `smb://server/share`), not a local mount point.
     case server(URL)
@@ -45,20 +47,21 @@ enum SidebarItem: Hashable {
         }
     }
 
-    /// Top-level sidebar row this item's branch hangs off. A root row is its
-    /// own root.
-    var rootURL: URL? {
+    /// Sidebar branch this row belongs to. A root row heads its own branch.
+    var branch: TreeBranch? {
         switch self {
-        case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa): return qa.url
-        case .folder(_, let root): return root
+        case .favoriteRoot(let qa): return TreeBranch(kind: .favorites, root: qa.url)
+        case .pcRoot(let qa):       return TreeBranch(kind: .thisPC,    root: qa.url)
+        case .cloudRoot(let qa):    return TreeBranch(kind: .cloud,     root: qa.url)
+        case .folder(_, let branch): return branch
         case .section, .server, .connectAction, .airdrop: return nil
         }
     }
 
     /// Branch-aware key into `FolderTreeStore`'s expansion state.
     var treeNode: TreeNode? {
-        guard let url = folderURL, let root = rootURL else { return nil }
-        return TreeNode(root: root, url: url)
+        guard let url = folderURL, let branch = branch else { return nil }
+        return TreeNode(branch: branch, url: url)
     }
 
     var isSection: Bool {
@@ -260,10 +263,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 }
             case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 let kids = tree.children(of: qa.url) ?? []
-                return kids.map { .folder($0, root: qa.url) }
-            case .folder(let url, let root):
+                guard let branch = item.branch else { return [] }
+                return kids.map { .folder($0, branch: branch) }
+            case .folder(let url, let branch):
                 let kids = tree.children(of: url) ?? []
-                return kids.map { .folder($0, root: root) }
+                return kids.map { .folder($0, branch: branch) }
             case .server, .connectAction, .airdrop:
                 return []
             }
@@ -371,8 +375,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             // in. Record it *before* navigating, so the reveal that navigate()
             // kicks off grows this branch rather than the other section showing
             // the same folder.
-            if let root = node.rootURL {
-                tree.activeRoot = root
+            if let branch = node.branch {
+                tree.activeBranch = branch
             }
             switch node {
             case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
@@ -915,15 +919,14 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         func locateItem(for url: URL) -> SidebarItem? {
             guard let ov = outlineView else { return nil }
             let target = url.standardizedFileURL.path
-            let activeRootPath = tree.activeRoot?.standardizedFileURL.path
             var best: SidebarItem?
             var bestRootLength = -1
             for i in 0..<ov.numberOfRows {
                 guard let node = ov.item(atRow: i) as? SidebarItem,
                       let nodeURL = node.folderURL,
                       nodeURL.standardizedFileURL.path == target else { continue }
-                let rootPath = (node.rootURL ?? nodeURL).standardizedFileURL.path
-                if rootPath == activeRootPath { return node }
+                if let branch = node.branch, branch == tree.activeBranch { return node }
+                let rootPath = (node.branch?.root ?? nodeURL).path
                 if rootPath.count > bestRootLength {
                     bestRootLength = rootPath.count
                     best = node
