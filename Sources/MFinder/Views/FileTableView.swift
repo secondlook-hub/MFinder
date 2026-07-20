@@ -1015,6 +1015,9 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         }
         cell.imageView?.image = item.icon
         cell.textField?.stringValue = item.name
+        // The badge alone doesn't say what it means; spell it out on hover.
+        cell.toolTip = item.isNotDownloaded
+            ? "온라인 전용 — 열거나 복사하면 자동으로 다운로드됩니다" : nil
         // Stamp the cell with its URL so async snippet completion can detect
         // when the cell has been recycled for a different row.
         cell.objectValue = item.url
@@ -1429,6 +1432,10 @@ extension FileTableView.Coordinator: NSMenuDelegate {
                 promptBatchRename(urls, nav: self.parent.nav)
             })
         }
+        menu.addItem(block(urls.count > 1 ? "이름 NFC로 정규화 (\(urls.count)개)…" : "이름 NFC로 정규화…") { [weak self] in
+            guard let self else { return }
+            promptNormalizeNames(urls, nav: self.parent.nav)
+        })
         menu.addItem(block("휴지통으로 이동") { [weak self] in
             self?.moveToTrash(urls)
         })

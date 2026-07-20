@@ -15,6 +15,12 @@ indirect enum UndoAction {
     /// Items sent to the Trash. Undo moves ~/.Trash/<name> back to where it
     /// came from.
     case trash(originals: [URL])
+    /// Renames recorded as raw path bytes rather than URLs (이름 NFC로 정규화).
+    /// `URL` normalizes any path it is handed to NFD, which would erase the
+    /// very distinction this action exists to restore, and `FileManager.moveItem`
+    /// re-decomposes on write — so both directions go through `rename(2)` on
+    /// the exact stored bytes.
+    case renameBytes(pairs: [(from: String, to: String)])
     /// Mixed operation (e.g. a paste that both moved cut entries and copied
     /// copy entries) undone as one ⌘Z.
     case batch([UndoAction])
@@ -76,6 +82,7 @@ final class UndoService: ObservableObject {
         case .move(let pairs):      return pairs.isEmpty
         case .create(let urls):     return urls.isEmpty
         case .trash(let originals): return originals.isEmpty
+        case .renameBytes(let pairs): return pairs.isEmpty
         case .batch(let actions):   return actions.allSatisfy { isEmpty($0) }
         }
     }
@@ -99,6 +106,20 @@ final class UndoService: ObservableObject {
                 }
             }
             return reverted.isEmpty ? nil : .move(pairs: reverted)
+
+        case .renameBytes(let pairs):
+            var reverted: [(from: String, to: String)] = []
+            for (from, to) in pairs.reversed() {
+                let ok = to.withCString { t in from.withCString { f in rename(t, f) } } == 0
+                if ok {
+                    reverted.append((from: to, to: from))
+                } else if firstError == nil {
+                    firstError = NSError(domain: NSPOSIXErrorDomain, code: Int(errno),
+                                         userInfo: [NSLocalizedDescriptionKey:
+                                                        String(cString: strerror(errno))])
+                }
+            }
+            return reverted.isEmpty ? nil : .renameBytes(pairs: reverted)
 
         case .create(let urls):
             var trashed: [URL] = []

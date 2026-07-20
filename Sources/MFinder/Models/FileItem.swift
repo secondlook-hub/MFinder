@@ -11,8 +11,22 @@ struct FileItem: Identifiable, Hashable {
     let creationDate: Date
     let typeDescription: String
     let icon: NSImage
+    /// Cloud sync state for File Provider items (OneDrive / Google Drive /
+    /// iCloud Drive). `.notCloud` for ordinary local files.
+    let cloudState: CloudState
+
+    enum CloudState {
+        case notCloud
+        /// Online-only: the name and size are known, the bytes are not on disk.
+        /// Opening or copying materializes it — macOS downloads transparently,
+        /// so this is a display concern, not a capability one.
+        case notDownloaded
+        case downloaded
+    }
 
     var displayName: String { name }
+
+    var isNotDownloaded: Bool { cloudState == .notDownloaded }
 
     var ext: String {
         isDirectory ? "" : url.pathExtension.lowercased()

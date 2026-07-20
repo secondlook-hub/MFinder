@@ -228,7 +228,7 @@ final class NavigationState: ObservableObject {
         }
 
         reload()
-        self.tree.ensureVisible(startingURL)
+        self.tree.ensureVisible(startingURL, stoppingAt: FileSystemService.shared.sidebarRootPaths())
         installWatchSubscriptions()
     }
 
@@ -283,7 +283,7 @@ final class NavigationState: ObservableObject {
         // Reveal the destination in the sidebar tree synchronously — symlink /
         // alias jumps land outside the previously-expanded subtree, so we need
         // to expand ancestors so the new row is visible and highlighted.
-        tree.ensureVisible(target)
+        tree.ensureVisible(target, stoppingAt: FileSystemService.shared.sidebarRootPaths())
     }
 
     func goBack() {

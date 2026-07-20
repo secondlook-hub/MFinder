@@ -12,6 +12,10 @@ enum SidebarItem: Hashable {
     case section(SidebarSection)
     case favoriteRoot(QuickAccessItem)
     case pcRoot(QuickAccessItem)
+    /// A cloud provider root under 클라우드 (OneDrive / Google Drive / iCloud…).
+    /// Just a local directory published by the provider's File Provider
+    /// extension — see FileSystemService.cloudLocations().
+    case cloudRoot(QuickAccessItem)
     case folder(URL)
     /// A remote server entry under the 네트워크 section. The URL is the
     /// server address (e.g. `smb://server/share`), not a local mount point.
@@ -30,7 +34,7 @@ enum SidebarItem: Hashable {
     /// to-be-mounted) servers as "no folder to act on".
     var folderURL: URL? {
         switch self {
-        case .favoriteRoot(let qa), .pcRoot(let qa): return qa.url
+        case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa): return qa.url
         case .folder(let url): return url
         case .section, .server, .connectAction, .airdrop: return nil
         }
@@ -45,12 +49,14 @@ enum SidebarItem: Hashable {
 enum SidebarSection: String, Hashable {
     case favorites = "즐겨찾기"
     case thisPC    = "내 PC"
+    case cloud     = "클라우드"
     case network   = "네트워크"
 
     var symbolName: String {
         switch self {
         case .favorites: return "star.fill"
         case .thisPC:    return "desktopcomputer"
+        case .cloud:     return "cloud.fill"
         case .network:   return "network"
         }
     }
@@ -60,6 +66,7 @@ enum SidebarSection: String, Hashable {
         switch self {
         case .favorites: return NSColor.systemYellow
         case .thisPC:    return ThemeService.shared.theme.accent.nsColor
+        case .cloud:     return NSColor.systemBlue
         case .network:   return .gray
         }
     }
@@ -128,10 +135,12 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         scrollView.documentView = outline
 
         outline.reloadData()
-        // All three sections start expanded — Network now carries at least
-        // the "서버에 연결…" action row so it's worth showing on launch.
+        // Every section starts expanded — Network carries at least the
+        // "서버에 연결…" action row, and 클라우드 is empty only when no
+        // provider client is installed.
         outline.expandItem(SidebarItem.section(.favorites))
         outline.expandItem(SidebarItem.section(.thisPC))
+        outline.expandItem(SidebarItem.section(.cloud))
         outline.expandItem(SidebarItem.section(.network))
 
         context.coordinator.installObservers()
@@ -195,7 +204,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         // The fixed top-level items.
         var rootItems: [SidebarItem] {
-            [.section(.favorites), .section(.thisPC), .section(.network)]
+            [.section(.favorites), .section(.thisPC), .section(.cloud), .section(.network)]
         }
 
         // MARK: Children resolution
@@ -210,6 +219,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                         + FileSystemService.shared.quickAccessLocations().map { .favoriteRoot($0) }
                 case .thisPC:
                     return FileSystemService.shared.thisPCLocations().map { .pcRoot($0) }
+                case .cloud:
+                    return FileSystemService.shared.cloudLocations().map { .cloudRoot($0) }
                 case .network:
                     // Recent servers from history + any currently-mounted
                     // remote volume that isn't already in the recents list
@@ -226,7 +237,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     rows.append(.connectAction)
                     return rows
                 }
-            case .favoriteRoot(let qa), .pcRoot(let qa):
+            case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 let kids = tree.children(of: qa.url) ?? []
                 return kids.map { .folder($0) }
             case .folder(let url):
@@ -256,7 +267,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 // The 네트워크 section is always expandable now — it carries
                 // at least the "서버에 연결…" action row.
                 return true
-            case .favoriteRoot, .pcRoot:
+            case .favoriteRoot, .pcRoot, .cloudRoot:
                 return true   // optimistic; chevron disappears on actual empty load
             case .folder(let url):
                 if let cached = tree.children(of: url) {
@@ -279,6 +290,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return makeQuickAccessCell(qa: qa, isPinned: false)
             case .pcRoot(let qa):
                 return makeQuickAccessCell(qa: qa, isPinned: false)
+            case .cloudRoot(let qa):
+                return makeCloudCell(qa: qa)
             case .folder(let url):
                 return makeFolderCell(url: url)
             case .server(let server):
@@ -334,7 +347,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                   let row = ov.selectedRowIndexes.first,
                   let node = ov.item(atRow: row) as? SidebarItem else { return }
             switch node {
-            case .favoriteRoot(let qa), .pcRoot(let qa):
+            case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 if nav.currentURL.standardizedFileURL.path != qa.url.standardizedFileURL.path {
                     nav.navigate(to: qa.url)
                 }
@@ -442,6 +455,20 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                                color: NSColor(red: 0.96, green: 0.78, blue: 0.18, alpha: 1.0),
                                name: qa.name,
                                url: qa.url)
+        }
+
+        /// Cloud provider root. Blue rather than the folder yellow so the
+        /// 클라우드 section reads as a distinct kind of location, and the
+        /// tooltip carries the real path — the display name is rewritten
+        /// ("OneDrive-개인" → "OneDrive — 개인") and wouldn't lead anyone back
+        /// to ~/Library/CloudStorage on its own.
+        private func makeCloudCell(qa: QuickAccessItem) -> NSView {
+            let cell = buildIconLabelCell(symbol: qa.systemSymbol,
+                                          color: NSColor.systemBlue,
+                                          name: qa.name,
+                                          url: qa.url)
+            cell.toolTip = qa.url.path
+            return cell
         }
 
         private func makeFolderCell(url: URL) -> NSView {
@@ -750,6 +777,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 ov.reloadData()
                 ov.expandItem(SidebarItem.section(.favorites))
                 ov.expandItem(SidebarItem.section(.thisPC))
+                ov.expandItem(SidebarItem.section(.cloud))
                 // Re-expand all known expanded URLs. Sort by depth so each
                 // parent is expanded before its children are looked up.
                 let urls = tree.expandedURLs.sorted {
@@ -826,17 +854,44 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         /// First match priority: an existing `.folder(url)` row anywhere in
         /// the visible outline; otherwise a top-level favorite / pcRoot
         /// whose URL matches.
+        /// Finds the row for `url`, preferring the one reached through the most
+        /// specific sidebar root.
+        ///
+        /// The same folder can appear under several sections — a OneDrive
+        /// subfolder is a child of its 클라우드 root *and* of 내 PC → 홈 →
+        /// Library → CloudStorage if the user expanded that chain by hand.
+        /// Taking the first row in display order would hand back the 내 PC copy
+        /// (that section sits higher), yanking the tree out of 클라우드. Ranking
+        /// by root-path length picks the section that owns the folder most
+        /// directly, which also keeps 즐겨찾기 → 바탕 화면 winning over
+        /// 내 PC → 홈 → Desktop.
         func locateItem(for url: URL) -> SidebarItem? {
             guard let ov = outlineView else { return nil }
             let target = url.standardizedFileURL.path
+            var best: SidebarItem?
+            var bestRootLength = -1
             for i in 0..<ov.numberOfRows {
-                guard let node = ov.item(atRow: i) as? SidebarItem else { continue }
-                if let nodeURL = node.folderURL,
-                   nodeURL.standardizedFileURL.path == target {
-                    return node
+                guard let node = ov.item(atRow: i) as? SidebarItem,
+                      let nodeURL = node.folderURL,
+                      nodeURL.standardizedFileURL.path == target else { continue }
+                // Climb to the topmost non-section ancestor — that row is the
+                // section root this match hangs off.
+                var rootPath = nodeURL.standardizedFileURL.path
+                var cursor: Any = node
+                while let parent = ov.parent(forItem: cursor),
+                      let parentNode = parent as? SidebarItem,
+                      !parentNode.isSection {
+                    cursor = parent
+                    if let u = parentNode.folderURL {
+                        rootPath = u.standardizedFileURL.path
+                    }
+                }
+                if rootPath.count > bestRootLength {
+                    bestRootLength = rootPath.count
+                    best = node
                 }
             }
-            return nil
+            return best
         }
 
         func rowIndex(for item: SidebarItem) -> Int? {
@@ -1073,7 +1128,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                         ov.expandItem(node)
                     }
                 })
-            case .favoriteRoot(let qa), .pcRoot(let qa):
+            case .favoriteRoot(let qa), .pcRoot(let qa), .cloudRoot(let qa):
                 buildItemMenu(menu, url: qa.url, isFolder: true, isPinnable: true)
             case .folder(let url):
                 buildItemMenu(menu, url: url, isFolder: true, isPinnable: true)
@@ -1221,6 +1276,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     self?.nav.renamingURL = url
                 })
             }
+            let nfcTitle = isMulti ? "이름 NFC로 정규화 (\(urls.count)개)…" : "이름 NFC로 정규화…"
+            menu.addItem(blockItem(nfcTitle) { [weak self] in
+                guard let self = self else { return }
+                promptNormalizeNames(urls, nav: self.nav)
+            })
             let trashTitle = isMulti ? "휴지통으로 이동 (\(urls.count)개)" : "휴지통으로 이동"
             menu.addItem(blockItem(trashTitle) { [weak self] in
                 guard let self = self else { return }

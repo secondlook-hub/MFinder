@@ -365,6 +365,10 @@ struct FileListView: View {
                 promptBatchRename(ordered, nav: nav)
             }
         }
+        Button(targets.count > 1 ? "이름 NFC로 정규화 (\(targets.count)개)…" : "이름 NFC로 정규화…") {
+            let ordered = nav.filteredItems.map(\.url).filter(Set(targets).contains)
+            promptNormalizeNames(ordered.isEmpty ? targets : ordered, nav: nav)
+        }
         Button("휴지통으로 이동", role: .destructive) {
             var trashed: [URL] = []
             for url in targets where (try? FileSystemService.shared.moveToTrash(url)) != nil {

@@ -122,7 +122,7 @@ private struct TabContent: View {
             StatusBar()
         }
         .onChange(of: tab.currentURL) { newURL in
-            tab.tree.ensureVisible(newURL)
+            tab.tree.ensureVisible(newURL, stoppingAt: FileSystemService.shared.sidebarRootPaths())
             tab.tree.reloadChildren(of: newURL.deletingLastPathComponent())
         }
     }

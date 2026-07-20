@@ -21,6 +21,10 @@ final class FileSystemService {
     private lazy var folderIcon:   NSImage = Self.makeWindowsStyleFolderIcon()
     private lazy var fileIcon:     NSImage = workspace.icon(for: .data)
     private let iconCacheLock = NSLock()
+    /// Badged variants of the icons above, keyed by the base icon's identity.
+    /// Compositing once per distinct base icon keeps this at a handful of
+    /// draws no matter how many online-only files a folder holds.
+    private var cloudBadgedIcons: [ObjectIdentifier: NSImage] = [:]
 
     /// Windows-style yellow folder, drawn vector so it scales clean at any view-mode size.
     /// Uses SF Symbol `folder.fill` tinted with the same yellow the sidebar tree uses.
@@ -56,10 +60,23 @@ final class FileSystemService {
     func fileItem(from url: URL) -> FileItem? {
         let keys: Set<URLResourceKey> = [
             .isDirectoryKey, .fileSizeKey, .contentModificationDateKey,
-            .creationDateKey, .localizedTypeDescriptionKey, .nameKey
+            .creationDateKey, .localizedTypeDescriptionKey, .nameKey,
+            // Third-party File Providers (OneDrive, Google Drive, Dropbox)
+            // report through the same "ubiquitous" keys as iCloud Drive, so
+            // one lookup covers every cloud folder. Folding these into the
+            // existing fetch keeps it at one resourceValues call per item —
+            // no extra stat(2) per row.
+            .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey
         ]
         guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
         let isDir = values.isDirectory ?? false
+        let cloudState: FileItem.CloudState
+        if values.isUbiquitousItem == true {
+            cloudState = values.ubiquitousItemDownloadingStatus == .notDownloaded
+                ? .notDownloaded : .downloaded
+        } else {
+            cloudState = .notCloud
+        }
         return FileItem(
             id: url,
             url: url,
@@ -69,8 +86,59 @@ final class FileSystemService {
             modificationDate: values.contentModificationDate ?? Date(),
             creationDate: values.creationDate ?? Date(),
             typeDescription: values.localizedTypeDescription ?? (isDir ? "파일 폴더" : "파일"),
-            icon: cachedIcon(for: url, isDirectory: isDir)
+            icon: icon(for: url, isDirectory: isDir, cloudState: cloudState),
+            cloudState: cloudState
         )
+    }
+
+    /// Icon for a row, badged when the item is online-only.
+    ///
+    /// Badging here rather than in each view means every view mode — details
+    /// table, icons, tiles, content — picks it up from `FileItem.icon` with no
+    /// rendering changes, and the badge scales with whatever size the view
+    /// draws the image at.
+    private func icon(for url: URL, isDirectory: Bool, cloudState: FileItem.CloudState) -> NSImage {
+        let base = cachedIcon(for: url, isDirectory: isDirectory)
+        guard cloudState == .notDownloaded else { return base }
+        let key = ObjectIdentifier(base)
+        iconCacheLock.lock()
+        if let cached = cloudBadgedIcons[key] {
+            iconCacheLock.unlock()
+            return cached
+        }
+        iconCacheLock.unlock()
+        let badged = Self.badgedWithCloud(base)
+        iconCacheLock.lock()
+        cloudBadgedIcons[key] = badged
+        iconCacheLock.unlock()
+        return badged
+    }
+
+    /// Draws a small download-cloud in the bottom-right corner, the same place
+    /// Finder badges its own cloud items. The base icon is dimmed a little so
+    /// an undownloaded file reads as "not really here yet" at a glance.
+    private static func badgedWithCloud(_ base: NSImage) -> NSImage {
+        let size = base.size
+        let out = NSImage(size: size)
+        out.lockFocus()
+        base.draw(in: NSRect(origin: .zero, size: size),
+                  from: .zero, operation: .sourceOver, fraction: 0.55)
+        let side = max(size.width * 0.50, 8)
+        let rect = NSRect(x: size.width - side, y: 0, width: side, height: side)
+        let config = NSImage.SymbolConfiguration(pointSize: side, weight: .semibold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.white, .systemBlue]))
+        if let symbol = NSImage(systemSymbolName: "arrow.down.circle.fill",
+                                accessibilityDescription: "온라인 전용")?
+            .withSymbolConfiguration(config) {
+            // Knock a hole in the base first so the badge stays legible over
+            // busy document thumbnails.
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: -1, dy: -1)).fill()
+            symbol.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        }
+        out.unlockFocus()
+        out.isTemplate = false
+        return out
     }
 
     /// Returns a 16x16 icon, cached per extension. App bundles get their own per-bundle icon.
@@ -283,6 +351,75 @@ final class FileSystemService {
             ))
         }
         return items
+    }
+
+    /// Every path that appears as a top-level row under a sidebar section.
+    /// `FolderTreeStore.ensureVisible` stops climbing here so a folder is
+    /// revealed under the section it belongs to instead of being re-rooted
+    /// through 내 PC → 홈.
+    func sidebarRootPaths() -> Set<String> {
+        var paths = Set<String>()
+        for item in quickAccessLocations() + thisPCLocations() + cloudLocations() {
+            paths.insert(item.url.standardizedFileURL.path)
+        }
+        return paths
+    }
+
+    /// Cloud provider roots — OneDrive / Google Drive / Dropbox / Box etc.
+    ///
+    /// Their macOS clients register File Provider extensions, which surface as
+    /// ordinary directories under `~/Library/CloudStorage` named
+    /// `Provider-AccountName` (e.g. `OneDrive-개인`, `GoogleDrive-me@gmail.com`).
+    /// Nothing here talks to a cloud API — the official client does the syncing
+    /// and MFinder just browses the folder it publishes. A provider with no
+    /// client installed simply has no directory, so it doesn't appear.
+    ///
+    /// Reading this directory is itself TCC-gated. Failure returns an empty
+    /// list rather than surfacing an error: this runs while *building the
+    /// sidebar*, and the permission alert belongs to an explicit navigation
+    /// (NavigationState.reload), not to app startup.
+    func cloudLocations() -> [QuickAccessItem] {
+        var items: [QuickAccessItem] = []
+
+        let cloudRoot = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/CloudStorage")
+        let entries = (try? fm.contentsOfDirectory(atPath: cloudRoot.path)) ?? []
+        for entry in entries.sorted() where !entry.hasPrefix(".") {
+            let url = cloudRoot.appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            items.append(QuickAccessItem(name: Self.cloudDisplayName(entry),
+                                         url: url,
+                                         systemSymbol: Self.cloudSymbol(for: entry)))
+        }
+
+        // iCloud Drive predates CloudStorage and lives on its own path.
+        let iCloud = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+        if fm.fileExists(atPath: iCloud.path) {
+            items.insert(QuickAccessItem(name: "iCloud Drive", url: iCloud, systemSymbol: "icloud"),
+                         at: 0)
+        }
+        return items
+    }
+
+    /// "OneDrive-개인" → "OneDrive — 개인". The directory name packs provider
+    /// and account with a hyphen; accounts can themselves contain hyphens, so
+    /// only the first one splits.
+    private static func cloudDisplayName(_ entry: String) -> String {
+        guard let dash = entry.firstIndex(of: "-") else { return entry }
+        let provider = String(entry[entry.startIndex..<dash])
+        let account = String(entry[entry.index(after: dash)...])
+        return account.isEmpty ? provider : "\(provider) — \(account)"
+    }
+
+    private static func cloudSymbol(for entry: String) -> String {
+        let lower = entry.lowercased()
+        if lower.hasPrefix("onedrive")   { return "cloud" }
+        if lower.hasPrefix("googledrive") { return "cloud" }
+        if lower.hasPrefix("dropbox")    { return "shippingbox" }
+        if lower.hasPrefix("box")        { return "shippingbox" }
+        return "cloud"
     }
 
     func thisPCLocations() -> [QuickAccessItem] {

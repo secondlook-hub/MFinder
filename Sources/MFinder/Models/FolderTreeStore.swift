@@ -62,11 +62,19 @@ final class FolderTreeStore: ObservableObject {
         }
     }
 
-    /// Walk up from `target`'s parent to `/` and expand each ancestor,
-    /// so `target` becomes visible in the tree. Also forces hidden ancestors
-    /// (e.g. `~/Library`) into their parent's children cache — otherwise the
-    /// chain breaks because `loadChildren` defaults to skipping hidden files.
-    func ensureVisible(_ target: URL) {
+    /// Walk up from `target`'s parent and expand each ancestor, so `target`
+    /// becomes visible in the tree. Also forces hidden ancestors (e.g.
+    /// `~/Library`) into their parent's children cache — otherwise the chain
+    /// breaks because `loadChildren` defaults to skipping hidden files.
+    ///
+    /// Walking stops at the first sidebar root reached (see
+    /// `FileSystemService.sidebarRootPaths()`), rather than continuing to `/`.
+    /// A OneDrive folder lives at `~/Library/CloudStorage/OneDrive-…/`, which
+    /// is reachable *both* from its 클라우드 root and from 내 PC → 홈 → Library.
+    /// Expanding all the way up materializes that second chain, and since 내 PC
+    /// sits above 클라우드 in the sidebar, the tree would then select the 내 PC
+    /// copy and visibly drag the user out of the section they were browsing.
+    func ensureVisible(_ target: URL, stoppingAt roots: Set<String> = []) {
         let targetURL = canonical(target)
         var current = targetURL.deletingLastPathComponent()
         var child = targetURL
@@ -75,6 +83,7 @@ final class FolderTreeStore: ObservableObject {
             safety += 1
             expand(current)
             ensureChildIncluded(child, of: current)
+            if roots.contains(current.standardizedFileURL.path) { break }
             let parent = current.deletingLastPathComponent()
             if parent.path == current.path { break }
             child = current
