@@ -184,6 +184,7 @@ Wrap the body in `MainActor.assumeIsolated { ... }`. Used by the Dock menu actio
 
 ## Version history (one line)
 
+- v1.27 — 탭에 파일 드롭. `TabBar.swift`의 각 `TabCell`에 `TabDropDelegate: DropDelegate` 추가 — 드롭하면 그 탭의 `nav.currentURL` 폴더로 이동(기본)/복사(⌥), 비활성 탭 위 0.6초 dwell 시 `activate()`로 스프링 로드 전환. 충돌 프롬프트(`askFileConflict`)·자기-폴더 가드·`FileOperationService.perform`·`UndoService.register`·refresh는 사이드바 `acceptDrop`과 동일 로직을 `performTabDrop(urls:into:copy:)`로 복제(@MainActor). `NSItemProvider.loadObject(ofClass: NSURL.self)`로 드롭 순서 보존해 URL 수집. DropDelegate 메서드는 nonisolated이므로 main-큐 완료 콜백에서 `MainActor.assumeIsolated`로 진입.
 - v1.26 — 탭 세션 복원 + 압축/압축 풀기 우클릭 승격 + 마우스 앞/뒤 버튼 신뢰성. ① `TabsState(restore:)`가 `PreferencesService.openTabPaths`/`activeTabIndex`에서 탭을 복원; 탭 추가/삭제/전환·각 탭의 `$currentURL`을 관찰해 저장한다. **함정**: `@Published`는 `willSet`에서 방출하므로 sink 안에서 `currentURL`을 읽으면 *이전* 값이라 탭이 한 단계 전 폴더로 열렸다 — `DispatchQueue.main.async`로 한 틱 미뤄 새 값이 반영된 뒤 저장. `--fresh` 인자(`launchNewMFinderInstance`가 부여, `MFinderLaunch.isFreshInstance`가 판정)를 가진 새 창은 복원하지 않고 홈에서 시작. ② `ArchiveService`(시스템 zip/tar/unzip)로 이미 있던 압축 기능이 "Bandizip" 하위 메뉴에 묻혀 있어 반디집 기능처럼 보였다 — FileTableView/FileListView에서 "압축하기"(기본 zip + 형식 선택)/"압축 풀기"(단일 압축 파일)로 승격, 실제 반디집 연동은 보내기 → Bandizip에만 남김. ③ 마우스 사이드 버튼 모니터를 `.otherMouseUp` 단독 → `[.otherMouseDown, .otherMouseUp]`로 바꿔 누르는 순간(down)에 네비게이트하고 up도 소비 — 파일 테이블/사이드바가 down을 처리할 때 up이 로컬 모니터에 안 잡히던 문제 해결.
 - v1.1 — Initial release.
 - v1.2 — In-app GitHub Releases auto-update + Help → "업데이트 확인…".
