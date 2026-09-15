@@ -16,6 +16,8 @@ final class PreferencesService {
     private let kGroupField    = "MFinder.groupField"
     private let kShowPreview   = "MFinder.showPreviewPane"
     private let kSidebarWidth  = "MFinder.sidebarWidth"
+    private let kOpenTabPaths   = "MFinder.openTabPaths"
+    private let kActiveTabIndex = "MFinder.activeTabIndex"
 
     var showHidden: Bool {
         get { defaults.bool(forKey: kShowHidden) }
@@ -81,6 +83,20 @@ final class PreferencesService {
             return stored > 0 ? stored : 240
         }
         set { defaults.set(newValue, forKey: kSidebarWidth) }
+    }
+
+    /// File-system paths of the tabs open in the last-active window, left→right.
+    /// Restored at launch so a quit/relaunch reopens the same set of tabs.
+    /// Written by `TabsState` whenever the tab set or active tab changes.
+    var openTabPaths: [String] {
+        get { defaults.stringArray(forKey: kOpenTabPaths) ?? [] }
+        set { defaults.set(newValue, forKey: kOpenTabPaths) }
+    }
+
+    /// Index of the active tab within `openTabPaths`.
+    var activeTabIndex: Int {
+        get { defaults.integer(forKey: kActiveTabIndex) }
+        set { defaults.set(newValue, forKey: kActiveTabIndex) }
     }
 
     var sortAscending: Bool {

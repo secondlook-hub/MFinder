@@ -399,32 +399,31 @@ struct FileListView: View {
 
         Divider()
 
-        // ── Bandizip-style submenu
-        Menu("Bandizip") {
-            Section("압축") {
-                ForEach(ArchiveFormat.allCases, id: \.self) { fmt in
-                    if ArchiveService.shared.canCompress(to: fmt) {
-                        Button("\(suggestedArchiveName(for: targets, ext: fmt.rawValue))(으)로 압축") {
-                            compressTargets(targets, format: fmt)
-                        }
+        // ── 압축 / 압축 풀기 (macOS 시스템 기본 도구; Bandizip 연동과는 별개)
+        Menu("압축하기") {
+            ForEach(ArchiveFormat.allCases, id: \.self) { fmt in
+                if ArchiveService.shared.canCompress(to: fmt) {
+                    Button("\(suggestedArchiveName(for: targets, ext: fmt.rawValue))(으)로 압축") {
+                        compressTargets(targets, format: fmt)
                     }
-                }
-                Button("압축하고 이메일 보내기…") {
-                    compressAndMail(targets)
                 }
             }
-            if targets.count == 1, ArchiveService.shared.isArchive(targets[0]) {
-                Section("압축 풀기") {
-                    Button("여기에 압축 풀기") { extractHere(targets[0]) }
-                    Button("\"\(ArchiveService.shared.basename(ofArchive: targets[0]))\" 폴더에 압축 풀기") {
-                        extractToFolder(targets[0])
-                    }
-                    Button("압축 풀 위치 선택…") { extractToCustomFolder(targets[0]) }
-                    Divider()
-                    Button("미리 보기") { quickLook([targets[0]]) }
-                    Button("압축 파일 검사") { testArchive(targets[0]) }
-                    Button("압축 파일 정보 보기") { archiveInfo(targets[0]) }
+            Divider()
+            Button("압축하고 이메일 보내기…") {
+                compressAndMail(targets)
+            }
+        }
+        if targets.count == 1, ArchiveService.shared.isArchive(targets[0]) {
+            Menu("압축 풀기") {
+                Button("여기에 압축 풀기") { extractHere(targets[0]) }
+                Button("\"\(ArchiveService.shared.basename(ofArchive: targets[0]))\" 폴더에 압축 풀기") {
+                    extractToFolder(targets[0])
                 }
+                Button("압축 풀 위치 선택…") { extractToCustomFolder(targets[0]) }
+                Divider()
+                Button("미리 보기") { quickLook([targets[0]]) }
+                Button("압축 파일 검사") { testArchive(targets[0]) }
+                Button("압축 파일 정보 보기") { archiveInfo(targets[0]) }
             }
         }
 
@@ -537,22 +536,20 @@ struct FileListView: View {
 
         Divider()
 
-        Menu("Bandizip") {
-            Section("이 폴더 압축") {
-                if ArchiveService.shared.canCompress(to: .zip) {
-                    Button("이 폴더를 Zip으로 압축") {
-                        compressFolderItself(nav.currentURL, format: .zip)
-                    }
+        Menu("이 폴더 압축") {
+            if ArchiveService.shared.canCompress(to: .zip) {
+                Button("이 폴더를 Zip으로 압축") {
+                    compressFolderItself(nav.currentURL, format: .zip)
                 }
-                if ArchiveService.shared.canCompress(to: .tarGz) {
-                    Button("이 폴더를 tar.gz로 압축") {
-                        compressFolderItself(nav.currentURL, format: .tarGz)
-                    }
+            }
+            if ArchiveService.shared.canCompress(to: .tarGz) {
+                Button("이 폴더를 tar.gz로 압축") {
+                    compressFolderItself(nav.currentURL, format: .tarGz)
                 }
-                if ArchiveService.shared.canCompress(to: .sevenZ) {
-                    Button("이 폴더를 7z로 압축") {
-                        compressFolderItself(nav.currentURL, format: .sevenZ)
-                    }
+            }
+            if ArchiveService.shared.canCompress(to: .sevenZ) {
+                Button("이 폴더를 7z로 압축") {
+                    compressFolderItself(nav.currentURL, format: .sevenZ)
                 }
             }
         }

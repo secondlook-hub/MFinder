@@ -165,18 +165,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Mouse side buttons (e.g. Logitech MX Master back/forward) navigate
     /// history, browser-style. AppKit reports them as "other" mouse buttons:
     /// buttonNumber 3 = back, 4 = forward.
+    ///
+    /// We act on `.otherMouseDown` (browser-standard: navigation fires on
+    /// press) and additionally swallow the matching `.otherMouseUp`. An earlier
+    /// version listened only on `.otherMouseUp`, but when the pointer is over a
+    /// subview that handles the mouse-down (the file table / sidebar outline),
+    /// the paired up event isn't reliably delivered to a *local* monitor — so
+    /// the buttons appeared dead. Handling the down event fixes that.
     private func installMouseMonitor() {
-        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseUp) { event in
-            switch event.buttonNumber {
-            case 3:
-                NotificationCenter.default.post(name: .mfinderGoBack, object: nil)
-                return nil
-            case 4:
-                NotificationCenter.default.post(name: .mfinderGoForward, object: nil)
-                return nil
-            default:
-                return event
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown, .otherMouseUp]) { event in
+            guard event.buttonNumber == 3 || event.buttonNumber == 4 else { return event }
+            // Consume both phases; navigate once, on the down phase.
+            if event.type == .otherMouseDown {
+                let name: Notification.Name = (event.buttonNumber == 3) ? .mfinderGoBack : .mfinderGoForward
+                NotificationCenter.default.post(name: name, object: nil)
             }
+            return nil
         }
     }
 
@@ -298,6 +302,9 @@ func launchNewMFinderInstance() {
     let config = NSWorkspace.OpenConfiguration()
     config.createsNewApplicationInstance = true
     config.activates = true
+    // Marks the spawned process as a secondary window so it starts at Home
+    // instead of restoring the persisted session tabs (see MFinderLaunch).
+    config.arguments = ["--fresh"]
     NSWorkspace.shared.openApplication(
         at: Bundle.main.bundleURL,
         configuration: config,

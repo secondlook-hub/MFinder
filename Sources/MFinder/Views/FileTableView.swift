@@ -1478,41 +1478,56 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        // Bandizip submenu
-        let banditem = NSMenuItem(title: "Bandizip", action: nil, keyEquivalent: "")
-        let bandmenu = NSMenu()
+        // 압축 / 압축 풀기 — macOS 시스템 기본 도구(zip/tar/unzip)로 처리한다.
+        // Bandizip 연동(보내기 → Bandizip)과는 별개의 기능.
+        let isSingleArchive = urls.count == 1 && ArchiveService.shared.isArchive(urls[0])
         let formats = ArchiveFormat.allCases.filter { ArchiveService.shared.canCompress(to: $0) }
-        for fmt in formats {
-            let name = suggestedArchiveName(for: urls, ext: fmt.rawValue)
-            bandmenu.addItem(block("\"\(name)\"(으)로 압축") { [weak self] in
-                self?.compress(urls: urls, format: fmt)
-            })
+
+        // 압축하기 — 최상위 항목(기본 zip) + 형식 선택 하위 메뉴.
+        if let defaultFormat = formats.first {
+            let defaultName = suggestedArchiveName(for: urls, ext: defaultFormat.rawValue)
+            let compressItem = block("\"\(defaultName)\"(으)로 압축") { [weak self] in
+                self?.compress(urls: urls, format: defaultFormat)
+            }
+            compressItem.title = "압축하기"
+            let compressMenu = NSMenu()
+            for fmt in formats {
+                let name = suggestedArchiveName(for: urls, ext: fmt.rawValue)
+                compressMenu.addItem(block("\"\(name)\"(으)로 압축") { [weak self] in
+                    self?.compress(urls: urls, format: fmt)
+                })
+            }
+            compressItem.submenu = compressMenu
+            menu.addItem(compressItem)
         }
-        if urls.count == 1, ArchiveService.shared.isArchive(urls[0]) {
-            bandmenu.addItem(.separator())
+
+        // 압축 풀기 — 단일 압축 파일을 선택했을 때만.
+        if isSingleArchive {
             let archive = urls[0]
-            bandmenu.addItem(block("여기에 압축 풀기") { [weak self] in
+            let extractItem = NSMenuItem(title: "압축 풀기", action: nil, keyEquivalent: "")
+            let extractMenu = NSMenu()
+            extractMenu.addItem(block("여기에 압축 풀기") { [weak self] in
                 self?.extractHere(archive)
             })
-            bandmenu.addItem(block("\"\(ArchiveService.shared.basename(ofArchive: archive))\" 폴더에 압축 풀기") { [weak self] in
+            extractMenu.addItem(block("\"\(ArchiveService.shared.basename(ofArchive: archive))\" 폴더에 압축 풀기") { [weak self] in
                 self?.extractToFolder(archive)
             })
-            bandmenu.addItem(block("압축 풀 위치 선택…") { [weak self] in
+            extractMenu.addItem(block("압축 풀 위치 선택…") { [weak self] in
                 self?.extractToCustomFolder(archive)
             })
-            bandmenu.addItem(.separator())
-            bandmenu.addItem(block("미리 보기") {
+            extractMenu.addItem(.separator())
+            extractMenu.addItem(block("미리 보기") {
                 QuickLookCoordinator.shared.toggle(urls: [archive])
             })
-            bandmenu.addItem(block("압축 파일 검사") { [weak self] in
+            extractMenu.addItem(block("압축 파일 검사") { [weak self] in
                 self?.testArchive(archive)
             })
-            bandmenu.addItem(block("압축 파일 정보 보기") { [weak self] in
+            extractMenu.addItem(block("압축 파일 정보 보기") { [weak self] in
                 self?.archiveInfo(archive)
             })
+            extractItem.submenu = extractMenu
+            menu.addItem(extractItem)
         }
-        banditem.submenu = bandmenu
-        menu.addItem(banditem)
 
         // Share
         let shareItem = NSMenuItem(title: "공유", action: nil, keyEquivalent: "")

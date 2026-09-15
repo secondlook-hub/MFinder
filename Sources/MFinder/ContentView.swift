@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @StateObject private var tabs = TabsState()
+    // Restore the previous session's tabs only for the primary launch; windows
+    // spawned via 새 창 (which pass --fresh) start at Home.
+    @StateObject private var tabs = TabsState(restore: !MFinderLaunch.isFreshInstance)
     @EnvironmentObject var updateChecker: UpdateChecker
     @ObservedObject private var themes = ThemeService.shared
 
