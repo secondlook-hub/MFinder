@@ -7,6 +7,10 @@ struct ContentView: View {
     @StateObject private var tabs = TabsState(restore: !MFinderLaunch.isFreshInstance)
     @EnvironmentObject var updateChecker: UpdateChecker
     @ObservedObject private var themes = ThemeService.shared
+    // Observe the language so switching it rebuilds the window content below
+    // (via .id(loc.generation)); every L(...) call then re-evaluates.
+    @ObservedObject private var loc = LocalizationService.shared
+    @State private var didLaunchUpdateCheck = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +25,11 @@ struct ContentView: View {
                 .environmentObject(tabs.active.tree)
                 .environmentObject(tabs)
         }
+        // A language change bumps loc.generation, giving this subtree a new
+        // identity so SwiftUI rebuilds it (and the AppKit representables within)
+        // against the newly-selected language. The update-check .task below is
+        // chained OUTSIDE this id and guarded, so it never re-fires on a switch.
+        .id(loc.generation)
         .background(themes.theme.windowBackground.color)
         .frame(minWidth: 900, minHeight: 600)
         .preferredColorScheme(themes.theme.isDark ? .dark : .light)
@@ -56,31 +65,35 @@ struct ContentView: View {
         }
         .task {
             // Auto-check GitHub Releases on launch. Silent on failure.
+            // Guard so a language switch (which rebuilds the content subtree)
+            // can never re-trigger the check.
+            guard !didLaunchUpdateCheck else { return }
+            didLaunchUpdateCheck = true
             await updateChecker.checkForUpdates()
         }
-        .alert("업데이트 사용 가능", isPresented: $updateChecker.updateAvailable) {
+        .alert(L("업데이트 사용 가능"), isPresented: $updateChecker.updateAvailable) {
             if let downloadURL = updateChecker.downloadURL {
-                Button("자동 설치") {
+                Button(L("자동 설치")) {
                     UpdateInstaller.shared.install(from: downloadURL,
                                                    version: updateChecker.latestVersion)
                 }
-                Button("직접 다운로드") {
+                Button(L("직접 다운로드")) {
                     NSWorkspace.shared.open(downloadURL)
                 }
             }
             if let releaseURL = updateChecker.releaseURL {
-                Button("릴리즈 보기") {
+                Button(L("릴리즈 보기")) {
                     NSWorkspace.shared.open(releaseURL)
                 }
             }
-            Button("나중에", role: .cancel) {}
+            Button(L("나중에"), role: .cancel) {}
         } message: {
-            Text("MFinder \(updateChecker.latestVersion) 버전이 출시되었습니다.\n(현재 버전: \(updateChecker.currentVersion))\n\n자동 설치를 누르면 다운로드부터 재실행까지 자동으로 진행됩니다.")
+            Text(Lf("MFinder %@ 버전이 출시되었습니다.\n(현재 버전: %@)\n\n자동 설치를 누르면 다운로드부터 재실행까지 자동으로 진행됩니다.", "\(updateChecker.latestVersion)", "\(updateChecker.currentVersion)"))
         }
-        .alert("최신 버전 사용 중", isPresented: $updateChecker.upToDate) {
-            Button("확인", role: .cancel) {}
+        .alert(L("최신 버전 사용 중"), isPresented: $updateChecker.upToDate) {
+            Button(L("확인"), role: .cancel) {}
         } message: {
-            Text("MFinder \(updateChecker.currentVersion)이(가) 최신 버전입니다.")
+            Text(Lf("MFinder %@이(가) 최신 버전입니다.", "\(updateChecker.currentVersion)"))
         }
     }
 }

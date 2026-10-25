@@ -22,13 +22,13 @@ struct ClipboardStackView: View {
 
     private var header: some View {
         HStack {
-            Text("복사 대기")
+            Text(L("복사 대기"))
                 .font(.system(size: 13, weight: .semibold))
-            Text("\(clipboard.stack.count)개")
+            Text(Lf("%@개", "\(clipboard.stack.count)"))
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
             Spacer()
-            Button("초기화") { clipboard.clear() }
+            Button(L("초기화")) { clipboard.clear() }
                 .buttonStyle(.borderless)
                 .disabled(clipboard.stack.isEmpty)
         }
@@ -44,7 +44,7 @@ struct ClipboardStackView: View {
                     Divider().opacity(0.3)
                 }
                 if clipboard.stack.isEmpty {
-                    Text("비어 있음")
+                    Text(L("비어 있음"))
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
@@ -80,7 +80,7 @@ struct ClipboardStackView: View {
                     .foregroundColor(Color(white: 0.55))
             }
             .buttonStyle(.plain)
-            .help("스택에서 제거")
+            .help(L("스택에서 제거"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
@@ -89,9 +89,9 @@ struct ClipboardStackView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             Spacer()
-            Button("닫기") { dismiss() }
+            Button(L("닫기")) { dismiss() }
                 .buttonStyle(.bordered)
-            Button("여기에 모두 붙여넣기") {
+            Button(L("여기에 모두 붙여넣기")) {
                 pasteAll()
             }
             .buttonStyle(.borderedProminent)
@@ -109,10 +109,10 @@ struct ClipboardStackView: View {
                 nav.reload(thenSelect: Set(created))
             case .failure(let error):
                 let alert = NSAlert()
-                alert.messageText = "붙여넣기 실패"
+                alert.messageText = L("붙여넣기 실패")
                 alert.informativeText = error.localizedDescription
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: "확인")
+                alert.addButton(withTitle: L("확인"))
                 alert.runModal()
             }
         }

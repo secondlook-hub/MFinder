@@ -29,14 +29,14 @@ struct PreviewPane: View {
                         .font(.system(size: themes.secondaryFontSize))
                         .foregroundColor(themes.theme.secondaryText.color)
                     if !item.isDirectory {
-                        Text("크기: \(item.sizeString)")
+                        Text(Lf("크기: %@", "\(item.sizeString)"))
                             .font(.system(size: themes.secondaryFontSize))
                             .foregroundColor(themes.theme.secondaryText.color)
                     }
-                    Text("수정한 날짜: \(item.modificationString)")
+                    Text(Lf("수정한 날짜: %@", "\(item.modificationString)"))
                         .font(.system(size: themes.secondaryFontSize))
                         .foregroundColor(themes.theme.secondaryText.color)
-                    Text("만든 날짜: \(item.creationString)")
+                    Text(Lf("만든 날짜: %@", "\(item.creationString)"))
                         .font(.system(size: themes.secondaryFontSize))
                         .foregroundColor(themes.theme.secondaryText.color)
                 }
@@ -48,7 +48,7 @@ struct PreviewPane: View {
                     Image(systemName: "eye")
                         .font(.system(size: 28))
                         .foregroundColor(themes.theme.secondaryText.color)
-                    Text("미리 볼 항목을 선택하세요")
+                    Text(L("미리 볼 항목을 선택하세요"))
                         .font(.system(size: themes.secondaryFontSize))
                         .foregroundColor(themes.theme.secondaryText.color)
                         .padding(.top, 6)

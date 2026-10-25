@@ -1,11 +1,14 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 /// Content of the Settings scene (⌘,). Font size + theme selection + custom
 /// theme management. All state lives in ThemeService.shared so every open
 /// window restyles live as controls change.
 struct SettingsView: View {
     @ObservedObject private var themes = ThemeService.shared
+    @ObservedObject private var loc = LocalizationService.shared
+    @State private var importResult: String?
 
     /// Non-nil while the theme editor sheet is up. Carries the draft the
     /// editor starts from (a copy of an existing custom theme, or a fresh
@@ -14,9 +17,41 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // ── 언어
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("언어")).font(.headline)
+                HStack(spacing: 10) {
+                    Picker(L("언어"), selection: languageSelection) {
+                        ForEach(loc.availableLanguages) { lang in
+                            Text(lang.menuLabel).tag(lang.rawValue)
+                        }
+                        if !loc.customCodes.isEmpty {
+                            Divider()
+                            ForEach(loc.customCodes, id: \.self) { code in
+                                Text(code).tag(code)
+                            }
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 220)
+                    Button(L("내보내기…")) { exportTranslations() }
+                    Button(L("불러오기…")) { importTranslations() }
+                }
+                Text(L("번역을 JSON 파일로 내보내 편집하거나 새 언어를 추가한 뒤 다시 불러올 수 있습니다. 메뉴 막대는 앱을 다시 시작하면 반영됩니다."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                if let importResult {
+                    Text(importResult)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Divider()
+
             // ── 폰트 크기
             VStack(alignment: .leading, spacing: 6) {
-                Text("폰트 크기").font(.headline)
+                Text(L("폰트 크기")).font(.headline)
                 HStack(spacing: 10) {
                     Slider(
                         value: $themes.fontSize,
@@ -27,10 +62,10 @@ struct SettingsView: View {
                     Text("\(Int(themes.fontSize))pt")
                         .monospacedDigit()
                         .frame(width: 36, alignment: .leading)
-                    Button("기본값") { themes.resetFontSize() }
+                    Button(L("기본값")) { themes.resetFontSize() }
                         .disabled(themes.fontSize == ThemeService.defaultFontSize)
                 }
-                Text("파일 목록·자세히 보기·사이드바 트리에 적용됩니다. (⌘= 크게 / ⌘- 작게 / ⌘0 기본)")
+                Text(L("파일 목록·자세히 보기·사이드바 트리에 적용됩니다. (⌘= 크게 / ⌘- 작게 / ⌘0 기본)"))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
@@ -39,15 +74,15 @@ struct SettingsView: View {
 
             // ── 테마
             VStack(alignment: .leading, spacing: 6) {
-                Text("테마").font(.headline)
-                Toggle("시스템 화면 모드에 맞춤 (라이트/다크 자동 전환)", isOn: $themes.followSystemAppearance)
-                Picker("테마", selection: selectedThemeName) {
-                    Section("기본 테마") {
-                        ForEach(Theme.builtins) { Text($0.name).tag($0.name) }
+                Text(L("테마")).font(.headline)
+                Toggle(L("시스템 화면 모드에 맞춤 (라이트/다크 자동 전환)"), isOn: $themes.followSystemAppearance)
+                Picker(L("테마"), selection: selectedThemeName) {
+                    Section(L("기본 테마")) {
+                        ForEach(Theme.builtins) { Text(L($0.name)).tag($0.name) }
                     }
                     if !themes.customThemes.isEmpty {
-                        Section("내 테마") {
-                            ForEach(themes.customThemes) { Text($0.name).tag($0.name) }
+                        Section(L("내 테마")) {
+                            ForEach(themes.customThemes) { Text(L($0.name)).tag($0.name) }
                         }
                     }
                 }
@@ -58,17 +93,17 @@ struct SettingsView: View {
                 themePreview(themes.current)
 
                 HStack(spacing: 8) {
-                    Button("새 테마 만들기…") {
+                    Button(L("새 테마 만들기…")) {
                         var draft = themes.current
-                        draft.name = uniqueThemeName(base: "내 테마")
+                        draft.name = uniqueThemeName(base: L("내 테마"))
                         editorDraft = ThemeEditorDraft(theme: draft, originalName: nil)
                     }
                     if !themes.isBuiltin(themes.current) {
-                        Button("현재 테마 편집…") {
+                        Button(L("현재 테마 편집…")) {
                             editorDraft = ThemeEditorDraft(theme: themes.current,
                                                            originalName: themes.current.name)
                         }
-                        Button("현재 테마 삭제") {
+                        Button(L("현재 테마 삭제")) {
                             themes.deleteCustomTheme(named: themes.current.name)
                         }
                     }
@@ -78,9 +113,60 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(20)
-        .frame(width: 460, height: 320, alignment: .topLeading)
+        .frame(width: 480, height: 440, alignment: .topLeading)
         .sheet(item: $editorDraft) { draft in
             ThemeEditorView(draft: draft)
+        }
+    }
+
+    // MARK: - Language
+
+    private var languageSelection: Binding<String> {
+        Binding(
+            get: {
+                // Show the built-in selection, or a custom imported code.
+                if let stored = UserDefaults.standard.string(forKey: "mfinder.language"),
+                   loc.customCodes.contains(stored) {
+                    return stored
+                }
+                return loc.current.rawValue
+            },
+            set: { raw in
+                if let lang = LocalizationService.Language(rawValue: raw) {
+                    loc.setLanguage(lang)
+                } else {
+                    loc.setCustomCode(raw)
+                }
+            }
+        )
+    }
+
+    private func exportTranslations() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "MFinder-translations.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try loc.exportJSON().write(to: url, options: .atomic)
+            importResult = L("내보내기 완료")
+        } catch {
+            importResult = L("내보내기 실패") + ": " + error.localizedDescription
+        }
+    }
+
+    private func importTranslations() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let codes = try loc.importJSON(data)
+            importResult = Lf("불러오기 완료 (%@)", codes.joined(separator: ", "))
+        } catch {
+            importResult = L("불러오기 실패") + ": " + error.localizedDescription
         }
     }
 
@@ -113,9 +199,9 @@ struct SettingsView: View {
                     .fill(entry.1.color)
                     .frame(width: 22, height: 16)
                     .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.gray.opacity(0.4), lineWidth: 0.5))
-                    .help(entry.0)
+                    .help(L(entry.0))
             }
-            Text(theme.isDark ? "다크 기반" : "라이트 기반")
+            Text(theme.isDark ? L("다크 기반") : L("라이트 기반"))
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .padding(.leading, 4)
@@ -151,23 +237,23 @@ struct ThemeEditorView: View {
 
     private var nameError: String? {
         let trimmed = draft.name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { return "이름을 입력하세요." }
-        if Theme.builtin(named: trimmed) != nil { return "기본 테마 이름은 사용할 수 없습니다." }
+        if trimmed.isEmpty { return L("이름을 입력하세요.") }
+        if Theme.builtin(named: trimmed) != nil { return L("기본 테마 이름은 사용할 수 없습니다.") }
         if trimmed != originalName,
            themes.customThemes.contains(where: { $0.name == trimmed }) {
-            return "같은 이름의 테마가 이미 있습니다."
+            return L("같은 이름의 테마가 이미 있습니다.")
         }
         return nil
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(originalName == nil ? "새 테마 만들기" : "테마 편집")
+            Text(originalName == nil ? L("새 테마 만들기") : L("테마 편집"))
                 .font(.headline)
 
             HStack {
-                Text("이름").frame(width: 90, alignment: .trailing)
-                TextField("테마 이름", text: $draft.name).frame(width: 200)
+                Text(L("이름")).frame(width: 90, alignment: .trailing)
+                TextField(L("테마 이름"), text: $draft.name).frame(width: 200)
             }
             if let err = nameError {
                 Text(err)
@@ -177,8 +263,8 @@ struct ThemeEditorView: View {
             }
 
             HStack {
-                Text("기반 모드").frame(width: 90, alignment: .trailing)
-                Toggle("다크 모드 (메뉴·대화 상자 등 시스템 요소)", isOn: $draft.isDark)
+                Text(L("기반 모드")).frame(width: 90, alignment: .trailing)
+                Toggle(L("다크 모드 (메뉴·대화 상자 등 시스템 요소)"), isOn: $draft.isDark)
             }
 
             Divider()
@@ -195,9 +281,9 @@ struct ThemeEditorView: View {
 
             HStack {
                 Spacer()
-                Button("취소") { dismiss() }
+                Button(L("취소")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("저장") { save() }
+                Button(L("저장")) { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(nameError != nil)
             }
@@ -208,9 +294,9 @@ struct ThemeEditorView: View {
 
     private func colorRow(_ label: String, _ keyPath: WritableKeyPath<Theme, CodableColor>) -> some View {
         HStack {
-            Text(label).frame(width: 90, alignment: .trailing)
+            Text(L(label)).frame(width: 90, alignment: .trailing)
             ColorPicker(
-                label,
+                L(label),
                 selection: Binding(
                     get: { draft[keyPath: keyPath].color },
                     set: { draft[keyPath: keyPath] = CodableColor($0) }

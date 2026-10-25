@@ -41,13 +41,13 @@ struct FileTableView: NSViewRepresentable {
         tableView.target = context.coordinator
         tableView.doubleAction = #selector(Coordinator.doubleClick(_:))
 
-        addColumn(to: tableView, id: "name",      title: "이름",       width: 260, minWidth: 120, maxWidth: 1200)
-        addColumn(to: tableView, id: "modified",  title: "수정한 날짜", width: 160, minWidth: 90,  maxWidth: 320)
-        addColumn(to: tableView, id: "type",      title: "유형",       width: 140, minWidth: 70,  maxWidth: 320)
-        addColumn(to: tableView, id: "size",      title: "크기",       width: 90,  minWidth: 60,  maxWidth: 200)
-        addColumn(to: tableView, id: "created",   title: "만든 날짜",   width: 160, minWidth: 90,  maxWidth: 320)
-        addColumn(to: tableView, id: "extension", title: "확장명",     width: 70,  minWidth: 50,  maxWidth: 160)
-        addColumn(to: tableView, id: "location",  title: "위치",       width: 260, minWidth: 80,  maxWidth: 800)
+        addColumn(to: tableView, id: "name",      title: L("이름"),       width: 260, minWidth: 120, maxWidth: 1200)
+        addColumn(to: tableView, id: "modified",  title: L("수정한 날짜"), width: 160, minWidth: 90,  maxWidth: 320)
+        addColumn(to: tableView, id: "type",      title: L("유형"),       width: 140, minWidth: 70,  maxWidth: 320)
+        addColumn(to: tableView, id: "size",      title: L("크기"),       width: 90,  minWidth: 60,  maxWidth: 200)
+        addColumn(to: tableView, id: "created",   title: L("만든 날짜"),   width: 160, minWidth: 90,  maxWidth: 320)
+        addColumn(to: tableView, id: "extension", title: L("확장명"),     width: 70,  minWidth: 50,  maxWidth: 160)
+        addColumn(to: tableView, id: "location",  title: L("위치"),       width: 260, minWidth: 80,  maxWidth: 800)
         // The "위치" column is meaningful only for search results.
         // (The matched-text preview is rendered inline under the filename in
         // the name column, not in a separate column.)
@@ -96,7 +96,7 @@ struct FileTableView: NSViewRepresentable {
     private func addColumn(to tableView: NSTableView, id: String, title: String,
                            width: CGFloat, minWidth: CGFloat, maxWidth: CGFloat) {
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
-        col.title = title
+        col.title = L(title)
         col.width = width
         col.minWidth = minWidth
         col.maxWidth = maxWidth
@@ -384,23 +384,23 @@ extension FileTableView {
             case .type:
                 return (0, item.typeDescription)
             case .ext:
-                if item.isDirectory { return (-1, "폴더") }
-                return item.ext.isEmpty ? (0, "(확장명 없음)") : (1, item.ext)
+                if item.isDirectory { return (-1, L("폴더")) }
+                return item.ext.isEmpty ? (0, L("(확장명 없음)")) : (1, item.ext)
             case .modified:
                 return dateBucket(item.modificationDate)
             case .created:
                 return dateBucket(item.creationDate)
             case .size:
-                if item.isDirectory { return (0, "폴더") }
+                if item.isDirectory { return (0, L("폴더")) }
                 let kb: Int64 = 1024, mb = kb * 1024, gb = mb * 1024
                 switch item.size {
-                case 0:                return (1, "비어 있음")
-                case ..<(16 * kb):     return (2, "아주 작음 (16KB 미만)")
-                case ..<mb:            return (3, "작음 (16KB - 1MB)")
-                case ..<(128 * mb):    return (4, "보통 (1MB - 128MB)")
-                case ..<gb:            return (5, "큼 (128MB - 1GB)")
-                case ..<(4 * gb):      return (6, "아주 큼 (1GB - 4GB)")
-                default:               return (7, "매우 큼 (4GB 이상)")
+                case 0:                return (1, L("비어 있음"))
+                case ..<(16 * kb):     return (2, L("아주 작음 (16KB 미만)"))
+                case ..<mb:            return (3, L("작음 (16KB - 1MB)"))
+                case ..<(128 * mb):    return (4, L("보통 (1MB - 128MB)"))
+                case ..<gb:            return (5, L("큼 (128MB - 1GB)"))
+                case ..<(4 * gb):      return (6, L("아주 큼 (1GB - 4GB)"))
+                default:               return (7, L("매우 큼 (4GB 이상)"))
                 }
             }
         }
@@ -408,15 +408,15 @@ extension FileTableView {
         private static func dateBucket(_ date: Date) -> (rank: Int, label: String) {
             let cal = Calendar.current
             let now = Date()
-            if cal.isDateInToday(date) { return (0, "오늘") }
-            if cal.isDateInYesterday(date) { return (1, "어제") }
-            if cal.isDate(date, equalTo: now, toGranularity: .weekOfYear) { return (2, "이번 주") }
+            if cal.isDateInToday(date) { return (0, L("오늘")) }
+            if cal.isDateInYesterday(date) { return (1, L("어제")) }
+            if cal.isDate(date, equalTo: now, toGranularity: .weekOfYear) { return (2, L("이번 주")) }
             if let lastWeek = cal.date(byAdding: .weekOfYear, value: -1, to: now),
-               cal.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear) { return (3, "지난주") }
-            if cal.isDate(date, equalTo: now, toGranularity: .month) { return (4, "이번 달") }
-            if cal.isDate(date, equalTo: now, toGranularity: .year) { return (5, "올해") }
-            if date > now { return (0, "오늘") }
-            return (6, "오래 전")
+               cal.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear) { return (3, L("지난주")) }
+            if cal.isDate(date, equalTo: now, toGranularity: .month) { return (4, L("이번 달")) }
+            if cal.isDate(date, equalTo: now, toGranularity: .year) { return (5, L("올해")) }
+            if date > now { return (0, L("오늘")) }
+            return (6, L("오래 전"))
         }
 
         @objc func doubleClick(_ sender: Any?) {
@@ -432,10 +432,10 @@ extension FileTableView {
                 FileSystemService.shared.openItem(target)
             case .broken(let url):
                 let alert = NSAlert()
-                alert.messageText = "열 수 없습니다"
-                alert.informativeText = "\(url.lastPathComponent)이(가) 가리키는 대상을 찾을 수 없습니다 (끊어진 바로 가기)."
+                alert.messageText = L("열 수 없습니다")
+                alert.informativeText = Lf("%@이(가) 가리키는 대상을 찾을 수 없습니다 (끊어진 바로 가기).", "\(url.lastPathComponent)")
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: "확인")
+                alert.addButton(withTitle: L("확인"))
                 alert.runModal()
             }
         }
@@ -1017,7 +1017,7 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
         cell.textField?.stringValue = item.name
         // The badge alone doesn't say what it means; spell it out on hover.
         cell.toolTip = item.isNotDownloaded
-            ? "온라인 전용 — 열거나 복사하면 자동으로 다운로드됩니다" : nil
+            ? L("온라인 전용 — 열거나 복사하면 자동으로 다운로드됩니다") : nil
         // Stamp the cell with its URL so async snippet completion can detect
         // when the cell has been recycled for a different row.
         cell.objectValue = item.url
@@ -1330,13 +1330,13 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             }
         } else {
             // 연결 프로그램 submenu
-            let appsItem = NSMenuItem(title: "연결 프로그램", action: nil, keyEquivalent: "")
+            let appsItem = NSMenuItem(title: L("연결 프로그램"), action: nil, keyEquivalent: "")
             let appsMenu = NSMenu()
             let appCandidates = NSWorkspace.shared.urlsForApplications(toOpen: target.url).prefix(8)
             for appURL in appCandidates {
                 let name = appURL.deletingPathExtension().lastPathComponent
                 appsMenu.addItem(block(name) { [weak self] in
-                    self?.openWith(urls, app: appURL, errorLabel: "\(name)(으)로 열기 실패")
+                    self?.openWith(urls, app: appURL, errorLabel: Lf("%@(으)로 열기 실패", "\(name)"))
                 })
             }
             appsMenu.addItem(.separator())
@@ -1381,7 +1381,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             self?.createAliases(urls)
         })
 
-        let copyAdv = NSMenuItem(title: "복사: 추가 옵션", action: nil, keyEquivalent: "")
+        let copyAdv = NSMenuItem(title: L("복사: 추가 옵션"), action: nil, keyEquivalent: "")
         let copyMenu = NSMenu()
         copyMenu.addItem(block("이름만 복사") { [weak self] in
             self?.copyToPasteboard(urls.map(\.lastPathComponent).joined(separator: "\n"))
@@ -1401,7 +1401,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         menu.addItem(copyAdv)
 
         // 새로 만들기 (creates inside the current folder, matching the empty-area menu).
-        let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
+        let newItem = NSMenuItem(title: L("새로 만들기"), action: nil, keyEquivalent: "")
         let newMenu = NSMenu()
         for (idx, tpl) in newItemTemplates.enumerated() {
             if idx == 1 { newMenu.addItem(.separator()) }
@@ -1427,26 +1427,26 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             }
         })
         if urls.count > 1 {
-            menu.addItem(block("일괄 이름 바꾸기 (\(urls.count)개)…") { [weak self] in
+            menu.addItem(block(Lf("일괄 이름 바꾸기 (%@개)…", "\(urls.count)")) { [weak self] in
                 guard let self else { return }
                 promptBatchRename(urls, nav: self.parent.nav)
             })
         }
-        menu.addItem(block(urls.count > 1 ? "이름 NFC로 정규화 (\(urls.count)개)…" : "이름 NFC로 정규화…") { [weak self] in
+        menu.addItem(block(urls.count > 1 ? Lf("이름 NFC로 정규화 (%@개)…", "\(urls.count)") : "이름 NFC로 정규화…") { [weak self] in
             guard let self else { return }
             promptNormalizeNames(urls, nav: self.parent.nav)
         })
-        menu.addItem(block("휴지통으로 이동") { [weak self] in
+        menu.addItem(block("휴지통으로 이동", key: "d", modifiers: .command, symbol: "trash") { [weak self] in
             self?.moveToTrash(urls)
         })
-        menu.addItem(block("영구 삭제") { [weak self] in
+        menu.addItem(block("영구 삭제", symbol: "trash.slash") { [weak self] in
             self?.permanentDelete(urls)
         })
 
         menu.addItem(.separator())
 
         // 보내기
-        let sendTo = NSMenuItem(title: "보내기", action: nil, keyEquivalent: "")
+        let sendTo = NSMenuItem(title: L("보내기"), action: nil, keyEquivalent: "")
         let sendMenu = NSMenu()
         sendMenu.addItem(block("바탕 화면 (바로 가기)") { [weak self] in
             self?.sendToDesktopShortcut(urls)
@@ -1486,14 +1486,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         // 압축하기 — 최상위 항목(기본 zip) + 형식 선택 하위 메뉴.
         if let defaultFormat = formats.first {
             let defaultName = suggestedArchiveName(for: urls, ext: defaultFormat.rawValue)
-            let compressItem = block("\"\(defaultName)\"(으)로 압축") { [weak self] in
+            let compressItem = block(Lf("\"%@\"(으)로 압축", "\(defaultName)")) { [weak self] in
                 self?.compress(urls: urls, format: defaultFormat)
             }
-            compressItem.title = "압축하기"
+            compressItem.title = L("압축하기")
             let compressMenu = NSMenu()
             for fmt in formats {
                 let name = suggestedArchiveName(for: urls, ext: fmt.rawValue)
-                compressMenu.addItem(block("\"\(name)\"(으)로 압축") { [weak self] in
+                compressMenu.addItem(block(Lf("\"%@\"(으)로 압축", "\(name)")) { [weak self] in
                     self?.compress(urls: urls, format: fmt)
                 })
             }
@@ -1504,12 +1504,12 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         // 압축 풀기 — 단일 압축 파일을 선택했을 때만.
         if isSingleArchive {
             let archive = urls[0]
-            let extractItem = NSMenuItem(title: "압축 풀기", action: nil, keyEquivalent: "")
+            let extractItem = NSMenuItem(title: L("압축 풀기"), action: nil, keyEquivalent: "")
             let extractMenu = NSMenu()
             extractMenu.addItem(block("여기에 압축 풀기") { [weak self] in
                 self?.extractHere(archive)
             })
-            extractMenu.addItem(block("\"\(ArchiveService.shared.basename(ofArchive: archive))\" 폴더에 압축 풀기") { [weak self] in
+            extractMenu.addItem(block(Lf("\"%@\" 폴더에 압축 풀기", "\(ArchiveService.shared.basename(ofArchive: archive))")) { [weak self] in
                 self?.extractToFolder(archive)
             })
             extractMenu.addItem(block("압축 풀 위치 선택…") { [weak self] in
@@ -1530,7 +1530,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         }
 
         // Share
-        let shareItem = NSMenuItem(title: "공유", action: nil, keyEquivalent: "")
+        let shareItem = NSMenuItem(title: L("공유"), action: nil, keyEquivalent: "")
         let shareMenu = NSMenu()
         shareMenu.addItem(block("AirDrop") { NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls) })
         shareMenu.addItem(block("메일") { NSSharingService(named: .composeEmail)?.perform(withItems: urls) })
@@ -1562,7 +1562,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         let nav = parent.nav
 
         // View
-        let viewItem = NSMenuItem(title: "보기", action: nil, keyEquivalent: "")
+        let viewItem = NSMenuItem(title: L("보기"), action: nil, keyEquivalent: "")
         let viewMenu = NSMenu()
         for mode in ViewMode.allCases {
             let item = block(mode.rawValue) { nav.viewMode = mode }
@@ -1573,7 +1573,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         menu.addItem(viewItem)
 
         // Sort
-        let sortItem = NSMenuItem(title: "정렬 기준", action: nil, keyEquivalent: "")
+        let sortItem = NSMenuItem(title: L("정렬 기준"), action: nil, keyEquivalent: "")
         let sortMenu = NSMenu()
         for field in SortField.allCases {
             let it = block(field.rawValue) { [weak self] in
@@ -1594,7 +1594,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         menu.addItem(sortItem)
 
         // Group
-        let groupItem = NSMenuItem(title: "그룹화 기준", action: nil, keyEquivalent: "")
+        let groupItem = NSMenuItem(title: L("그룹화 기준"), action: nil, keyEquivalent: "")
         let groupMenu = NSMenu()
         for field in GroupField.allCases {
             let it = block(field.rawValue) { nav.groupField = field }
@@ -1631,7 +1631,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         menu.addItem(.separator())
 
         // 새로 만들기
-        let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
+        let newItem = NSMenuItem(title: L("새로 만들기"), action: nil, keyEquivalent: "")
         let newMenu = NSMenu()
         for (idx, tpl) in newItemTemplates.enumerated() {
             if idx == 1 { newMenu.addItem(.separator()) }
@@ -1648,7 +1648,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         let bandItem = NSMenuItem(title: "Bandizip", action: nil, keyEquivalent: "")
         let bandMenu = NSMenu()
         for fmt in ArchiveFormat.allCases where ArchiveService.shared.canCompress(to: fmt) {
-            bandMenu.addItem(block("이 폴더를 \(fmt.rawValue)로 압축") { [weak self] in
+            bandMenu.addItem(block(Lf("이 폴더를 %@로 압축", "\(fmt.rawValue)")) { [weak self] in
                 self?.compressFolderItself(nav.currentURL, format: fmt)
             })
         }
@@ -1679,10 +1679,18 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     // representedObject. This is the conventional AppKit dispatch pattern and
     // avoids subclassing NSMenuItem.
 
-    private func block(_ title: String, key: String = "", _ action: @escaping () -> Void) -> NSMenuItem {
-        let item = NSMenuItem(title: title,
+    private func block(_ title: String,
+                       key: String = "",
+                       modifiers: NSEvent.ModifierFlags = [],
+                       symbol: String? = nil,
+                       _ action: @escaping () -> Void) -> NSMenuItem {
+        let item = NSMenuItem(title: L(title),
                               action: #selector(invokeMenuAction(_:)),
                               keyEquivalent: key)
+        if !key.isEmpty { item.keyEquivalentModifierMask = modifiers }
+        if let symbol {
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        }
         item.target = self
         item.representedObject = ActionBox(action: action)
         return item
@@ -1702,7 +1710,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         } else if !folderName.isEmpty {
             base = folderName
         } else {
-            base = "압축"
+            base = L("압축")
         }
         return "\(base).\(ext)"
     }
@@ -1751,7 +1759,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.prompt = "선택"
+        panel.prompt = L("선택")
         if panel.runModal() == .OK, let dst = panel.url {
             do {
                 try ArchiveService.shared.extract(url, into: dst)
@@ -1763,14 +1771,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     private func testArchive(_ url: URL) {
         do {
             let result = try ArchiveService.shared.testArchive(url)
-            longAlert(title: "압축 파일 검사", text: result.isEmpty ? "이상 없음." : result)
+            longAlert(title: L("압축 파일 검사"), text: result.isEmpty ? "이상 없음." : result)
         } catch { alertError("검사 실패", message: error.localizedDescription) }
     }
 
     private func archiveInfo(_ url: URL) {
         do {
             let result = try ArchiveService.shared.archiveInfo(url)
-            longAlert(title: "압축 파일 정보 — \(url.lastPathComponent)", text: result)
+            longAlert(title: Lf("압축 파일 정보 — %@", "\(url.lastPathComponent)"), text: result)
         } catch { alertError("정보 표시 실패", message: error.localizedDescription) }
     }
 
@@ -1816,7 +1824,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         var firstErr: Error?
         var created: [URL] = []
         for src in urls {
-            let dst = unique("\(src.lastPathComponent) 바로 가기", in: desktop)
+            let dst = unique(Lf("%@ 바로 가기", "\(src.lastPathComponent)"), in: desktop)
             do {
                 try FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)
                 created.append(dst)
@@ -1833,7 +1841,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         var created: [URL] = []
         var firstErr: Error?
         for src in urls {
-            let dst = unique("\(src.lastPathComponent) 바로 가기", in: parent.nav.currentURL)
+            let dst = unique(Lf("%@ 바로 가기", "\(src.lastPathComponent)"), in: parent.nav.currentURL)
             do {
                 try FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)
                 created.append(dst)
@@ -1922,7 +1930,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
     private func openInEditor(_ url: URL, bundleId: String) {
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
-            alertError("앱을 찾을 수 없습니다", message: "\(bundleId) 가 설치되지 않았습니다.")
+            alertError("앱을 찾을 수 없습니다", message: Lf("%@ 가 설치되지 않았습니다.", "\(bundleId)"))
             return
         }
         openWith([url], app: appURL, errorLabel: "에디터로 열기 실패")
@@ -1931,10 +1939,10 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     private func promptTags(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = "태그"
-        alert.informativeText = "쉼표로 구분하여 입력하세요 (예: 작업, 중요)."
-        alert.addButton(withTitle: "적용")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = L("태그")
+        alert.informativeText = L("쉼표로 구분하여 입력하세요 (예: 작업, 중요).")
+        alert.addButton(withTitle: L("적용"))
+        alert.addButton(withTitle: L("취소"))
         let tf = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         let existing = (try? (urls[0] as NSURL).resourceValues(forKeys: [.tagNamesKey])[.tagNamesKey] as? [String]) ?? []
         tf.stringValue = existing.joined(separator: ", ")
@@ -1966,7 +1974,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     }
 
     private func createNewFolder() {
-        let url = unique("새 폴더", in: parent.nav.currentURL)
+        let url = unique(L("새 폴더"), in: parent.nav.currentURL)
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
             UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
@@ -1979,7 +1987,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     private func createNewFile(name: String) {
         let url = unique(name, in: parent.nav.currentURL)
         guard FileManager.default.createFile(atPath: url.path, contents: Data()) else {
-            alertError("파일 만들기 실패", message: "\(url.path) 에 파일을 만들 수 없습니다.")
+            alertError("파일 만들기 실패", message: Lf("%@ 에 파일을 만들 수 없습니다.", "\(url.path)"))
             return
         }
         UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
@@ -1996,11 +2004,11 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
     private func permanentDelete(_ urls: [URL]) {
         let alert = NSAlert()
-        alert.messageText = "영구 삭제하시겠습니까?"
-        alert.informativeText = "이 작업은 되돌릴 수 없습니다. \(urls.count)개 항목이 영구적으로 삭제됩니다."
+        alert.messageText = L("영구 삭제하시겠습니까?")
+        alert.informativeText = Lf("이 작업은 되돌릴 수 없습니다. %@개 항목이 영구적으로 삭제됩니다.", "\(urls.count)")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "삭제")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("삭제"))
+        alert.addButton(withTitle: L("취소"))
         if alert.runModal() == .alertFirstButtonReturn {
             var firstErr: Error?
             var deleted: [URL] = []
@@ -2022,10 +2030,10 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
     private func promptRename(_ url: URL) {
         let alert = NSAlert()
-        alert.messageText = "이름 바꾸기"
-        alert.informativeText = "새 이름을 입력하세요."
-        alert.addButton(withTitle: "확인")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = L("이름 바꾸기")
+        alert.informativeText = L("새 이름을 입력하세요.")
+        alert.addButton(withTitle: L("확인"))
+        alert.addButton(withTitle: L("취소"))
         let tf = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         tf.stringValue = url.lastPathComponent
         alert.accessoryView = tf
@@ -2046,14 +2054,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         let alert = NSAlert()
         alert.messageText = item.name
         var lines: [String] = []
-        lines.append("종류: \(item.typeDescription)")
-        lines.append("경로: \(item.url.path)")
-        if !item.isDirectory { lines.append("크기: \(item.sizeString)") }
-        lines.append("수정한 날짜: \(item.modificationString)")
+        lines.append(Lf("종류: %@", "\(item.typeDescription)"))
+        lines.append(Lf("경로: %@", "\(item.url.path)"))
+        if !item.isDirectory { lines.append(Lf("크기: %@", "\(item.sizeString)")) }
+        lines.append(Lf("수정한 날짜: %@", "\(item.modificationString)"))
         alert.informativeText = lines.joined(separator: "\n")
         alert.icon = item.icon
-        alert.addButton(withTitle: "확인")
-        alert.addButton(withTitle: "Finder에서 보기")
+        alert.addButton(withTitle: L("확인"))
+        alert.addButton(withTitle: L("Finder에서 보기"))
         if alert.runModal() == .alertSecondButtonReturn {
             FileSystemService.shared.revealInFinder(item.url)
         }
@@ -2063,34 +2071,34 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         let alert = NSAlert()
         alert.messageText = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
         var lines: [String] = []
-        lines.append("종류: 폴더")
-        lines.append("경로: \(url.path)")
+        lines.append(L("종류: 폴더"))
+        lines.append(Lf("경로: %@", "\(url.path)"))
         if let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
             let f = DateFormatter()
             f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            if let m = vals.contentModificationDate { lines.append("수정한 날짜: \(f.string(from: m))") }
-            if let c = vals.creationDate { lines.append("만든 날짜: \(f.string(from: c))") }
+            if let m = vals.contentModificationDate { lines.append(Lf("수정한 날짜: %@", "\(f.string(from: m))")) }
+            if let c = vals.creationDate { lines.append(Lf("만든 날짜: %@", "\(f.string(from: c))")) }
         }
         let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path).count) ?? 0
-        lines.append("항목 수: \(count)")
+        lines.append(Lf("항목 수: %@", "\(count)"))
         alert.informativeText = lines.joined(separator: "\n")
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("확인"))
         alert.runModal()
     }
 
     private func alertError(_ title: String, message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("확인"))
         alert.runModal()
     }
 
     private func longAlert(title: String, text: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.addButton(withTitle: "확인")
+        alert.messageText = L(title)
+        alert.addButton(withTitle: L("확인"))
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 520, height: 280))
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder

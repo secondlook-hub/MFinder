@@ -22,7 +22,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Archive (System Tools)** — Right-click → 압축하기 to compress the selection to .zip (default) / .7z / .tar.gz / etc., and 압축 풀기 (on a single archive) to extract it here / to a subfolder / to a chosen location. Uses the system's own `zip` / `tar` / `unzip` tools — separate from the optional Bandizip hand-off below. RAR / 7z fall back to Bandizip.app when no CLI extractor (`unrar`, `unar`, `7z`) is installed
 - **Send to Bandizip** — "보내기 → Bandizip" hands selected files off to Bandizip.app when it's installed
 - **Send To** — 바탕 화면 (바로 가기), 다운로드, 문서, AirDrop, 메일, 메시지
-- **Trash / Delete** — ⌫ or ⌘⌫ moves to Trash via Finder (recoverable), ⌥⌘⌫ deletes immediately with confirmation, ⌘⇧⌫ empties the entire Trash
+- **Trash / Delete** — ⌫ or ⌘⌫ moves to Trash via Finder (recoverable); ⌘D does the same (Windows Explorer's Ctrl+D), and the right-click "휴지통으로 이동" item shows a trash icon. ⌥⌘⌫ deletes immediately with confirmation, ⌘⇧⌫ empties the entire Trash
 - **Tab Bar** — Drag tabs to reorder; close-other-tabs from the context menu; tabs share the sidebar tree state
 - **Drop onto a Tab** — Drag files onto a tab to move them into that tab's folder (hold Option to copy), with the same 덮어쓰기 / 건너뛰기 / 취소 prompt, progress panel, and ⌘Z undo as any other drop. Hovering over an inactive tab for a moment spring-loads it open so you can see the destination before releasing
 - **Pinned Favorites** — Add any folder to the 즐겨찾기 sidebar section via the right-click menu in either the sidebar tree or the file list ("즐겨찾기에 추가" / "즐겨찾기에서 제거"). The built-in presets (바탕 화면/다운로드/문서/사진/음악/동영상) are removable too, Explorer-style; right-click the 즐겨찾기 section header to restore hidden presets
@@ -48,7 +48,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Batch Rename** — Multi-select → right-click → 일괄 이름 바꾸기: number sequentially from a base name, or find/replace inside names; one ⌘Z undoes the whole batch
 - **AirDrop** — Sidebar AirDrop row: click to send the current selection (or pick files), or drag files onto it; also in 공유/보내기 context menus
 - **Type-Ahead** — Typing in the details view jumps to the next matching filename
-- **Korean UI** — Fully Korean menu bar: the app declares a Korean-only localization, so system-provided menus (파일/편집/보기/윈도우/도움말, MFinder에 관하여, 종료 등) render in Korean alongside the app's own labels
+- **Multilingual UI** — 한국어 (default) / English / 日本語 / 简体中文, switchable at runtime in 설정 (⌘,) → 언어 (defaults to the system language). The window updates instantly; the menu bar follows after a relaunch. Korean is the source language, so anything untranslated gracefully falls back to Korean. Translations can be exported to a JSON file, edited (or extended with a brand-new language), and imported back — no rebuild needed
 
 ## Install
 

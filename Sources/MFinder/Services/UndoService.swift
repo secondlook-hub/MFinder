@@ -47,8 +47,8 @@ final class UndoService: ObservableObject {
 
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
-    var undoMenuTitle: String { undoStack.last.map { "\($0.label) 실행 취소" } ?? "실행 취소" }
-    var redoMenuTitle: String { redoStack.last.map { "\($0.label) 다시 실행" } ?? "다시 실행" }
+    var undoMenuTitle: String { undoStack.last.map { Lf("%@ 실행 취소", "\($0.label)") } ?? "실행 취소" }
+    var redoMenuTitle: String { redoStack.last.map { Lf("%@ 다시 실행", "\($0.label)") } ?? "다시 실행" }
 
     func register(_ action: UndoAction, label: String) {
         guard !isEmpty(action) else { return }
@@ -165,11 +165,11 @@ final class UndoService: ObservableObject {
 
     private func reportFailure(_ title: String, error: Error?) {
         let alert = NSAlert()
-        alert.messageText = title
+        alert.messageText = L(title)
         alert.informativeText = error?.localizedDescription
-            ?? "되돌릴 항목을 찾을 수 없습니다. 이미 이동되었거나 삭제되었을 수 있습니다."
+            ?? L("되돌릴 항목을 찾을 수 없습니다. 이미 이동되었거나 삭제되었을 수 있습니다.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("확인"))
         alert.runModal()
     }
 }

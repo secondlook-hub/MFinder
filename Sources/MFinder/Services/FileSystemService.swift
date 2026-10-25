@@ -85,7 +85,7 @@ final class FileSystemService {
             size: Int64(values.fileSize ?? 0),
             modificationDate: values.contentModificationDate ?? Date(),
             creationDate: values.creationDate ?? Date(),
-            typeDescription: values.localizedTypeDescription ?? (isDir ? "파일 폴더" : "파일"),
+            typeDescription: values.localizedTypeDescription ?? (isDir ? L("파일 폴더") : L("파일")),
             icon: icon(for: url, isDirectory: isDir, cloudState: cloudState),
             cloudState: cloudState
         )
@@ -277,7 +277,7 @@ final class FileSystemService {
                 userInfo: [NSLocalizedDescriptionKey:
                     stderr.isEmpty
                         ? "Finder가 휴지통 비우기를 거부했습니다."
-                        : "Finder 오류: \(stderr.trimmingCharacters(in: .whitespacesAndNewlines))"]
+                        : Lf("Finder 오류: %@", "\(stderr.trimmingCharacters(in: .whitespacesAndNewlines))")]
             )
         }
     }
@@ -307,7 +307,7 @@ final class FileSystemService {
         do { try task.run() } catch {
             throw NSError(
                 domain: "MFinder.Trash", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "osascript 실행 실패: \(error.localizedDescription)"]
+                userInfo: [NSLocalizedDescriptionKey: Lf("osascript 실행 실패: %@", "\(error.localizedDescription)")]
             )
         }
         task.waitUntilExit()
@@ -316,7 +316,7 @@ final class FileSystemService {
             let stderr = String(data: data, encoding: .utf8) ?? ""
             let msg = stderr.isEmpty
                 ? "Finder가 휴지통 이동을 거부했습니다."
-                : "Finder 오류: \(stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
+                : Lf("Finder 오류: %@", "\(stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
             throw NSError(
                 domain: "MFinder.Trash",
                 code: Int(task.terminationStatus),
@@ -328,12 +328,12 @@ final class FileSystemService {
     func quickAccessLocations() -> [QuickAccessItem] {
         let home = fm.homeDirectoryForCurrentUser
         var items: [QuickAccessItem] = [
-            QuickAccessItem(name: "바탕 화면",   url: home.appendingPathComponent("Desktop"),     systemSymbol: "menubar.dock.rectangle", isPinned: false),
-            QuickAccessItem(name: "다운로드",     url: home.appendingPathComponent("Downloads"),   systemSymbol: "arrow.down.circle",      isPinned: false),
-            QuickAccessItem(name: "문서",         url: home.appendingPathComponent("Documents"),   systemSymbol: "doc.text",               isPinned: false),
-            QuickAccessItem(name: "사진",         url: home.appendingPathComponent("Pictures"),    systemSymbol: "photo",                  isPinned: false),
-            QuickAccessItem(name: "음악",         url: home.appendingPathComponent("Music"),       systemSymbol: "music.note",             isPinned: false),
-            QuickAccessItem(name: "동영상",       url: home.appendingPathComponent("Movies"),      systemSymbol: "film",                   isPinned: false)
+            QuickAccessItem(name: L("바탕 화면"),   url: home.appendingPathComponent("Desktop"),     systemSymbol: "menubar.dock.rectangle", isPinned: false),
+            QuickAccessItem(name: L("다운로드"),     url: home.appendingPathComponent("Downloads"),   systemSymbol: "arrow.down.circle",      isPinned: false),
+            QuickAccessItem(name: L("문서"),         url: home.appendingPathComponent("Documents"),   systemSymbol: "doc.text",               isPinned: false),
+            QuickAccessItem(name: L("사진"),         url: home.appendingPathComponent("Pictures"),    systemSymbol: "photo",                  isPinned: false),
+            QuickAccessItem(name: L("음악"),         url: home.appendingPathComponent("Music"),       systemSymbol: "music.note",             isPinned: false),
+            QuickAccessItem(name: L("동영상"),       url: home.appendingPathComponent("Movies"),      systemSymbol: "film",                   isPinned: false)
         ]
         // Built-ins the user removed (Explorer-style) are filtered out; the
         // 즐겨찾기 section's right-click menu restores them.
@@ -445,9 +445,9 @@ final class FileSystemService {
     func thisPCLocations() -> [QuickAccessItem] {
         let home = fm.homeDirectoryForCurrentUser
         var items: [QuickAccessItem] = [
-            QuickAccessItem(name: "홈 (\(NSUserName()))", url: home, systemSymbol: "house"),
-            QuickAccessItem(name: "응용 프로그램", url: URL(fileURLWithPath: "/Applications"), systemSymbol: "app.badge"),
-            QuickAccessItem(name: "로컬 디스크 (C:)", url: URL(fileURLWithPath: "/"), systemSymbol: "internaldrive")
+            QuickAccessItem(name: Lf("홈 (%@)", "\(NSUserName())"), url: home, systemSymbol: "house"),
+            QuickAccessItem(name: L("응용 프로그램"), url: URL(fileURLWithPath: "/Applications"), systemSymbol: "app.badge"),
+            QuickAccessItem(name: L("로컬 디스크 (C:)"), url: URL(fileURLWithPath: "/"), systemSymbol: "internaldrive")
         ]
         let volumes = fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
         for v in volumes where v.path != "/" {

@@ -31,11 +31,15 @@ if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
     cp "$ROOT/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
 
-# Korean localization marker: the bundle declares only `ko`, so AppKit /
-# SwiftUI load their framework strings (File/Edit/Window/Help, About, Quit,
-# Close, Enter Full Screen, …) in Korean regardless of system language,
-# matching the app's Korean-only UI.
-mkdir -p "$APP_BUNDLE/Contents/Resources/ko.lproj"
+# Localization markers: the bundle declares ko (default) + en/ja/zh-Hans so
+# AppKit / SwiftUI load their framework strings (File/Edit/Window/Help, About,
+# Quit, Close, Enter Full Screen, …) in whichever of those the user picks.
+# MFinder's own UI is localized at runtime by LocalizationService; these empty
+# .lproj dirs just let AppKit's own framework strings follow AppleLanguages
+# (set by the in-app language picker on relaunch). ko stays first/default.
+for lang in ko en ja zh-Hans; do
+    mkdir -p "$APP_BUNDLE/Contents/Resources/$lang.lproj"
+done
 
 # PkgInfo
 printf "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"

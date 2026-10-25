@@ -361,7 +361,7 @@ final class NavigationState: ObservableObject {
                 case .failure(let err):
                     self.items = []
                     if Self.isPermissionError(err) {
-                        self.errorMessage = "이 폴더에 접근 권한이 없습니다."
+                        self.errorMessage = L("이 폴더에 접근 권한이 없습니다.")
                         self.presentPermissionAlert(for: url)
                     } else {
                         self.errorMessage = err.localizedDescription
@@ -397,7 +397,7 @@ final class NavigationState: ObservableObject {
         permissionAlertedURLs.insert(std)
 
         let alert = NSAlert()
-        alert.messageText = "이 폴더에 접근할 수 없습니다"
+        alert.messageText = L("이 폴더에 접근할 수 없습니다")
         alert.informativeText = """
             \(std.lastPathComponent) 폴더의 내용을 읽으려면 macOS의 추가 권한이 필요합니다.
 
@@ -406,8 +406,8 @@ final class NavigationState: ObservableObject {
             시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한 에서 MFinder를 추가하거나 켜고, 앱을 다시 시작해 주세요.
             """
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "시스템 설정 열기")
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("시스템 설정 열기"))
+        alert.addButton(withTitle: L("확인"))
         if alert.runModal() == .alertFirstButtonReturn {
             // x-apple.systempreferences URL → Privacy & Security → Full Disk Access
             if let prefURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
@@ -475,7 +475,7 @@ final class NavigationState: ObservableObject {
             comps.insert((name, url), at: 0)
             url = url.deletingLastPathComponent()
         }
-        comps.insert(("내 PC", URL(fileURLWithPath: "/")), at: 0)
+        comps.insert((L("내 PC"), URL(fileURLWithPath: "/")), at: 0)
         return comps
     }
 

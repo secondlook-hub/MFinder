@@ -7,6 +7,9 @@
     <key>CFBundleLocalizations</key>
     <array>
         <string>ko</string>
+        <string>en</string>
+        <string>ja</string>
+        <string>zh-Hans</string>
     </array>
     <key>CFBundleName</key>
     <string>MFinder</string>
@@ -21,9 +24,9 @@
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleVersion</key>
-    <string>1.27</string>
+    <string>1.28</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.27</string>
+    <string>1.28</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundlePackageType</key>

@@ -303,7 +303,7 @@ final class ArchiveService {
             task.executableURL = URL(fileURLWithPath: bin)
             task.arguments = ["t", archive.path]
         } else {
-            return "이 형식은 검사할 수 없습니다."
+            return L("이 형식은 검사할 수 없습니다.")
         }
         try task.run()
         task.waitUntilExit()
@@ -328,7 +328,7 @@ final class ArchiveService {
             task.executableURL = URL(fileURLWithPath: bin)
             task.arguments = ["l", archive.path]
         } else {
-            return "정보를 표시할 수 없습니다."
+            return L("정보를 표시할 수 없습니다.")
         }
         try task.run()
         task.waitUntilExit()
@@ -345,8 +345,8 @@ final class ArchiveService {
         task.waitUntilExit()
         if task.terminationStatus != 0 {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let msg = String(data: data, encoding: .utf8) ?? "알 수 없는 오류"
-            throw makeError("명령 실행 실패 (코드 \(task.terminationStatus)): \(msg)")
+            let msg = String(data: data, encoding: .utf8) ?? L("알 수 없는 오류")
+            throw makeError(Lf("명령 실행 실패 (코드 %@): %@", "\(task.terminationStatus)", "\(msg)"))
         }
     }
 

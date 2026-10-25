@@ -151,11 +151,11 @@ final class NetworkConnectService: ObservableObject {
     private static func error(for status: Int32) -> NSError {
         let msg: String
         switch status {
-        case -6600:           msg = "사용자 인증에 실패했습니다."
-        case -6602:           msg = "암호가 필요합니다."
-        case -1073741412:     msg = "지원하지 않는 URL 스킴입니다."
-        case -65280...(-1):   msg = "서버에 연결할 수 없습니다. (NetFS \(status))"
-        default:              msg = "서버 연결 실패 (코드: \(status))"
+        case -6600:           msg = L("사용자 인증에 실패했습니다.")
+        case -6602:           msg = L("암호가 필요합니다.")
+        case -1073741412:     msg = L("지원하지 않는 URL 스킴입니다.")
+        case -65280...(-1):   msg = Lf("서버에 연결할 수 없습니다. (NetFS %@)", "\(status)")
+        default:              msg = Lf("서버 연결 실패 (코드: %@)", "\(status)")
         }
         return NSError(
             domain: "MFinder.NetFS", code: Int(status),

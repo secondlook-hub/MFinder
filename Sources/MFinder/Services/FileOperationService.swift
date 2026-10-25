@@ -45,7 +45,7 @@ final class FileOperationService {
         guard !ops.isEmpty else { completion([], nil); return }
 
         let cancel = CancelFlag()
-        let panel = FileProgressPanel(title: title) { cancel.cancel() }
+        let panel = FileProgressPanel(title: L(title)) { cancel.cancel() }
         var finished = false
         // Delay the panel so quick batches never flash a window.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -261,7 +261,7 @@ private final class FileProgressPanel: NSObject {
         bar.maxValue = 1
         bar.doubleValue = 0
 
-        let cancelButton = NSButton(title: "취소", target: nil, action: nil)
+        let cancelButton = NSButton(title: L("취소"), target: nil, action: nil)
         cancelButton.target = self
         cancelButton.action = #selector(cancelPressed(_:))
 

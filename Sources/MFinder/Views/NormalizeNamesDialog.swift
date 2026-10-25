@@ -13,22 +13,22 @@ func promptNormalizeNames(_ urls: [URL], nav: NavigationState) {
 
     if FilenameNormalization.isFutile(at: first) {
         showTreeAlert("이 볼륨에서는 정규화할 수 없습니다",
-                      "HFS+ 볼륨은 파일 이름을 항상 NFD로 저장합니다. NFC로 바꿔도 파일 시스템이 즉시 되돌리기 때문에 의미가 없습니다.")
+                      L("HFS+ 볼륨은 파일 이름을 항상 NFD로 저장합니다. NFC로 바꿔도 파일 시스템이 즉시 되돌리기 때문에 의미가 없습니다."))
         return
     }
 
     let controller = NormalizePreview(urls: urls)
     if controller.shallowPlan.isEmpty && controller.deepPlan().isEmpty {
         showTreeAlert("정규화할 항목이 없습니다",
-                      "선택한 항목과 그 하위 항목의 이름이 이미 모두 NFC입니다.")
+                      L("선택한 항목과 그 하위 항목의 이름이 이미 모두 NFC입니다."))
         return
     }
 
     let alert = NSAlert()
-    alert.messageText = "이름 NFC로 정규화 (\(urls.count)개 선택)"
-    alert.informativeText = "화면에 보이는 글자는 그대로이고, 디스크에 저장되는 코드만 바뀝니다.\nGit 저장소나 동기화 폴더에서는 이름이 바뀐 것으로 인식될 수 있습니다."
-    alert.addButton(withTitle: "정규화")
-    alert.addButton(withTitle: "취소")
+    alert.messageText = Lf("이름 NFC로 정규화 (%@개 선택)", "\(urls.count)")
+    alert.informativeText = L("화면에 보이는 글자는 그대로이고, 디스크에 저장되는 코드만 바뀝니다.\nGit 저장소나 동기화 폴더에서는 이름이 바뀐 것으로 인식될 수 있습니다.")
+    alert.addButton(withTitle: L("정규화"))
+    alert.addButton(withTitle: L("취소"))
     alert.accessoryView = controller.accessoryView
     controller.render()
 
@@ -61,7 +61,7 @@ private final class NormalizePreview: NSObject {
     let shallowPlan: [(from: String, to: String)]
     private var cachedDeepPlan: [(from: String, to: String)]?
 
-    private let checkbox = NSButton(checkboxWithTitle: "하위 폴더 포함", target: nil, action: nil)
+    private let checkbox = NSButton(checkboxWithTitle: L("하위 폴더 포함"), target: nil, action: nil)
     private let textView = NSTextView()
     let accessoryView = NSStackView()
 
@@ -111,14 +111,14 @@ private final class NormalizePreview: NSObject {
         let plan = currentPlan
         guard !plan.isEmpty else {
             textView.string = checkbox.state == .on
-                ? "정규화할 항목이 없습니다."
-                : "선택한 항목 자체는 이미 NFC입니다.\n하위 폴더 포함을 켜면 안쪽 항목을 확인합니다."
+                ? L("정규화할 항목이 없습니다.")
+                : L("선택한 항목 자체는 이미 NFC입니다.\n하위 폴더 포함을 켜면 안쪽 항목을 확인합니다.")
             return
         }
         // Shallowest first reads better than the deepest-first apply order.
         let lines = plan
             .sorted { $0.from.count < $1.from.count }
             .map { ($0.from as NSString).lastPathComponent }
-        textView.string = "\(plan.count)개 항목:\n\n" + lines.joined(separator: "\n")
+        textView.string = Lf("%@개 항목:\n\n", "\(plan.count)") + lines.joined(separator: "\n")
     }
 }

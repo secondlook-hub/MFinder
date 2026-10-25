@@ -23,7 +23,7 @@ final class UpdateInstaller {
 
     func install(from downloadURL: URL, version: String) {
         guard panel == nil else { return }  // already installing
-        let panel = UpdateProgressPanel(title: "MFinder \(version) 업데이트")
+        let panel = UpdateProgressPanel(title: Lf("MFinder %@ 업데이트", "\(version)"))
         self.panel = panel
         panel.show(status: "다운로드 중…")
 
@@ -36,12 +36,12 @@ final class UpdateInstaller {
                 panel.close()
                 self.panel = nil
                 let alert = NSAlert()
-                alert.messageText = "자동 업데이트 실패"
+                alert.messageText = L("자동 업데이트 실패")
                 alert.informativeText = error.localizedDescription
                     + "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다."
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: "확인")
-                alert.addButton(withTitle: "다운로드 페이지 열기")
+                alert.addButton(withTitle: L("확인"))
+                alert.addButton(withTitle: L("다운로드 페이지 열기"))
                 if alert.runModal() == .alertSecondButtonReturn {
                     NSWorkspace.shared.open(downloadURL)
                 }
@@ -53,7 +53,7 @@ final class UpdateInstaller {
         // 1. Download the DMG.
         let (tempFile, response) = try await URLSession.shared.download(from: downloadURL)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw InstallError(message: "다운로드에 실패했습니다 (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
+            throw InstallError(message: Lf("다운로드에 실패했습니다 (HTTP %@).", "\((response as? HTTPURLResponse)?.statusCode ?? 0)"))
         }
         let dmg = tempFile.deletingLastPathComponent().appendingPathComponent("MFinder-update.dmg")
         try? FileManager.default.removeItem(at: dmg)
@@ -134,7 +134,7 @@ final class UpdateInstaller {
                     let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
                     continuation.resume(throwing: InstallError(
                         message: detail.isEmpty
-                            ? "\(URL(fileURLWithPath: launchPath).lastPathComponent) 실행 실패 (코드 \(task.terminationStatus))"
+                            ? Lf("%@ 실행 실패 (코드 %@)", "\(URL(fileURLWithPath: launchPath).lastPathComponent)", "\(task.terminationStatus)")
                             : detail))
                 } else {
                     continuation.resume(returning: stdout)
@@ -194,7 +194,7 @@ private final class UpdateProgressPanel {
     }
 
     func show(status: String) {
-        statusLabel.stringValue = status
+        statusLabel.stringValue = L(status)
         panel.orderFrontRegardless()
     }
 

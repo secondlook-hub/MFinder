@@ -257,10 +257,10 @@ struct FileListView: View {
                                 Text(item.name).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color)
                             }
                             HStack(spacing: 16) {
-                                Text("수정한 날짜: \(item.modificationString)")
+                                Text(Lf("수정한 날짜: %@", "\(item.modificationString)"))
                                 Text(item.typeDescription)
                                 if !item.isDirectory {
-                                    Text("크기: \(item.sizeString)")
+                                    Text(Lf("크기: %@", "\(item.sizeString)"))
                                 }
                             }
                             .font(.system(size: themes.secondaryFontSize))
@@ -289,16 +289,16 @@ struct FileListView: View {
         let targets = currentTargets(for: item)
 
         // ── Open
-        Button("열기") { targets.forEach { url in openURL(url) } }
+        Button(L("열기")) { targets.forEach { url in openURL(url) } }
             .keyboardShortcut(.return, modifiers: [])
 
         if item.isDirectory {
-            Button("새 탭에서 열기") {
+            Button(L("새 탭에서 열기")) {
                 NotificationCenter.default.post(name: .mfinderNewTab, object: item.url)
             }
-            Button("새 창에서 열기") { FileSystemService.shared.openItem(item.url) }
+            Button(L("새 창에서 열기")) { FileSystemService.shared.openItem(item.url) }
         } else {
-            Menu("연결 프로그램") {
+            Menu(L("연결 프로그램")) {
                 ForEach(applications(for: item.url), id: \.path) { appURL in
                     Button(appURL.deletingPathExtension().lastPathComponent) {
                         openWith(items: targets, app: appURL)
@@ -306,70 +306,70 @@ struct FileListView: View {
                 }
                 Divider()
                 Button("App Store…") { NSWorkspace.shared.open(URL(string: "macappstore://")!) }
-                Button("다른 앱 선택…") { chooseAppAndOpen(targets) }
+                Button(L("다른 앱 선택…")) { chooseAppAndOpen(targets) }
             }
         }
-        Button("빠른 보기") { quickLook(targets) }
+        Button(L("빠른 보기")) { quickLook(targets) }
             .keyboardShortcut(.space, modifiers: [])
 
-        Button("정보 가져오기") { showProperties(item) }
+        Button(L("정보 가져오기")) { showProperties(item) }
             .keyboardShortcut("i", modifiers: .command)
 
         if item.isDirectory {
-            Button("폴더에서 새 터미널 열기") { openTerminal(at: item.url) }
-            Button("폴더에서 새 VS Code 열기") { openInEditor(item.url, bundleId: "com.microsoft.VSCode") }
+            Button(L("폴더에서 새 터미널 열기")) { openTerminal(at: item.url) }
+            Button(L("폴더에서 새 VS Code 열기")) { openInEditor(item.url, bundleId: "com.microsoft.VSCode") }
         }
 
         Divider()
 
         // ── Clipboard
-        Button("잘라내기") { ClipboardService.shared.cut(targets) }
+        Button(L("잘라내기")) { ClipboardService.shared.cut(targets) }
             .keyboardShortcut("x", modifiers: .command)
-        Button("복사") { ClipboardService.shared.copy(targets) }
+        Button(L("복사")) { ClipboardService.shared.copy(targets) }
             .keyboardShortcut("c", modifiers: .command)
-        Button("붙여넣기") { pasteIntoCurrentFolder() }
+        Button(L("붙여넣기")) { pasteIntoCurrentFolder() }
         .keyboardShortcut("v", modifiers: .command)
         .disabled(!clipboard.hasContent)
-        Button("바로 가기 만들기") { createAliases(targets) }
-        Menu("복사: 추가 옵션") {
-            Button("이름만 복사") { copyToPasteboard(targets.map { $0.lastPathComponent }.joined(separator: "\n")) }
-            Button("전체 경로 복사") { copyToPasteboard(targets.map { $0.path }.joined(separator: "\n")) }
-            Button("file:// URL 복사") { copyToPasteboard(targets.map { $0.absoluteString }.joined(separator: "\n")) }
-            Button("UNIX 경로 (쉘 이스케이프) 복사") {
+        Button(L("바로 가기 만들기")) { createAliases(targets) }
+        Menu(L("복사: 추가 옵션")) {
+            Button(L("이름만 복사")) { copyToPasteboard(targets.map { $0.lastPathComponent }.joined(separator: "\n")) }
+            Button(L("전체 경로 복사")) { copyToPasteboard(targets.map { $0.path }.joined(separator: "\n")) }
+            Button(L("file:// URL 복사")) { copyToPasteboard(targets.map { $0.absoluteString }.joined(separator: "\n")) }
+            Button(L("UNIX 경로 (쉘 이스케이프) 복사")) {
                 copyToPasteboard(targets.map { "'\($0.path.replacingOccurrences(of: "'", with: "'\\''"))'" }.joined(separator: " "))
             }
         }
 
-        Menu("새로 만들기") {
-            Button("폴더") { createNewFolder() }
+        Menu(L("새로 만들기")) {
+            Button(L("폴더")) { createNewFolder() }
             Divider()
-            Button("텍스트 문서") { createNewFile(name: "새 텍스트 문서.txt") }
-            Button("Markdown 문서") { createNewFile(name: "새 문서.md") }
-            Button("리치 텍스트 문서") { createNewFile(name: "새 문서.rtf") }
-            Button("Shell 스크립트") { createNewFile(name: "새 스크립트.sh") }
-            Button("HTML 문서") { createNewFile(name: "새 문서.html") }
-            Button("JSON 파일") { createNewFile(name: "새 데이터.json") }
+            Button(L("텍스트 문서")) { createNewFile(name: L("새 텍스트 문서.txt")) }
+            Button(L("Markdown 문서")) { createNewFile(name: L("새 문서.md")) }
+            Button(L("리치 텍스트 문서")) { createNewFile(name: L("새 문서.rtf")) }
+            Button(L("Shell 스크립트")) { createNewFile(name: L("새 스크립트.sh")) }
+            Button(L("HTML 문서")) { createNewFile(name: L("새 문서.html")) }
+            Button(L("JSON 파일")) { createNewFile(name: L("새 데이터.json")) }
         }
 
         Divider()
 
         // ── Rename / Delete
-        Button("이름 바꾸기") {
+        Button(L("이름 바꾸기")) {
             DispatchQueue.main.async { nav.renamingURL = item.url }
         }
         .keyboardShortcut(.return, modifiers: .command)
         if targets.count > 1 {
-            Button("일괄 이름 바꾸기 (\(targets.count)개)…") {
+            Button(Lf("일괄 이름 바꾸기 (%@개)…", "\(targets.count)")) {
                 // Preserve list order for numbering (Set order is unstable).
                 let ordered = nav.filteredItems.map(\.url).filter(Set(targets).contains)
                 promptBatchRename(ordered, nav: nav)
             }
         }
-        Button(targets.count > 1 ? "이름 NFC로 정규화 (\(targets.count)개)…" : "이름 NFC로 정규화…") {
+        Button(targets.count > 1 ? Lf("이름 NFC로 정규화 (%@개)…", "\(targets.count)") : "이름 NFC로 정규화…") {
             let ordered = nav.filteredItems.map(\.url).filter(Set(targets).contains)
             promptNormalizeNames(ordered.isEmpty ? targets : ordered, nav: nav)
         }
-        Button("휴지통으로 이동", role: .destructive) {
+        Button(role: .destructive) {
             var trashed: [URL] = []
             for url in targets where (try? FileSystemService.shared.moveToTrash(url)) != nil {
                 trashed.append(url)
@@ -377,99 +377,103 @@ struct FileListView: View {
             UndoService.shared.register(.trash(originals: trashed), label: "휴지통으로 이동")
             nav.selectedItems.subtract(targets)
             nav.reload()
+        } label: {
+            Label(L("휴지통으로 이동"), systemImage: "trash")
         }
-        .keyboardShortcut(.delete)
-        Button("영구 삭제", role: .destructive) { permanentDelete(targets) }
-            .keyboardShortcut(.delete, modifiers: .shift)
+        .keyboardShortcut("d", modifiers: .command)
+        Button(role: .destructive) { permanentDelete(targets) } label: {
+            Label(L("영구 삭제"), systemImage: "trash.slash")
+        }
+        .keyboardShortcut(.delete, modifiers: .shift)
 
         Divider()
 
         // ── Send To
-        Menu("보내기") {
-            Button("바탕 화면 (바로 가기 만들기)") { sendToDesktopShortcut(targets) }
-            Button("다운로드 폴더") { copyURLs(targets, to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")) }
-            Button("문서 폴더") { copyURLs(targets, to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")) }
+        Menu(L("보내기")) {
+            Button(L("바탕 화면 (바로 가기 만들기)")) { sendToDesktopShortcut(targets) }
+            Button(L("다운로드 폴더")) { copyURLs(targets, to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")) }
+            Button(L("문서 폴더")) { copyURLs(targets, to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")) }
             Divider()
             Button("AirDrop") { airDrop(targets) }
-            Button("메일 수신자") { mailURLs(targets) }
-            Button("메시지") { shareVia(.composeMessage, urls: targets) }
+            Button(L("메일 수신자")) { mailURLs(targets) }
+            Button(L("메시지")) { shareVia(.composeMessage, urls: targets) }
             Divider()
-            Button("압축 (Zip) 폴더") { compressTargets(targets, format: .zip) }
+            Button(L("압축 (Zip) 폴더")) { compressTargets(targets, format: .zip) }
         }
 
         Divider()
 
         // ── 압축 / 압축 풀기 (macOS 시스템 기본 도구; Bandizip 연동과는 별개)
-        Menu("압축하기") {
+        Menu(L("압축하기")) {
             ForEach(ArchiveFormat.allCases, id: \.self) { fmt in
                 if ArchiveService.shared.canCompress(to: fmt) {
-                    Button("\(suggestedArchiveName(for: targets, ext: fmt.rawValue))(으)로 압축") {
+                    Button(Lf("%@(으)로 압축", "\(suggestedArchiveName(for: targets, ext: fmt.rawValue))")) {
                         compressTargets(targets, format: fmt)
                     }
                 }
             }
             Divider()
-            Button("압축하고 이메일 보내기…") {
+            Button(L("압축하고 이메일 보내기…")) {
                 compressAndMail(targets)
             }
         }
         if targets.count == 1, ArchiveService.shared.isArchive(targets[0]) {
-            Menu("압축 풀기") {
-                Button("여기에 압축 풀기") { extractHere(targets[0]) }
-                Button("\"\(ArchiveService.shared.basename(ofArchive: targets[0]))\" 폴더에 압축 풀기") {
+            Menu(L("압축 풀기")) {
+                Button(L("여기에 압축 풀기")) { extractHere(targets[0]) }
+                Button(Lf("\"%@\" 폴더에 압축 풀기", "\(ArchiveService.shared.basename(ofArchive: targets[0]))")) {
                     extractToFolder(targets[0])
                 }
-                Button("압축 풀 위치 선택…") { extractToCustomFolder(targets[0]) }
+                Button(L("압축 풀 위치 선택…")) { extractToCustomFolder(targets[0]) }
                 Divider()
-                Button("미리 보기") { quickLook([targets[0]]) }
-                Button("압축 파일 검사") { testArchive(targets[0]) }
-                Button("압축 파일 정보 보기") { archiveInfo(targets[0]) }
+                Button(L("미리 보기")) { quickLook([targets[0]]) }
+                Button(L("압축 파일 검사")) { testArchive(targets[0]) }
+                Button(L("압축 파일 정보 보기")) { archiveInfo(targets[0]) }
             }
         }
 
         Divider()
 
         // ── Share / Tags
-        Menu("공유") {
+        Menu(L("공유")) {
             Button("AirDrop") { airDrop(targets) }
-            Button("메일") { shareVia(.composeEmail, urls: targets) }
-            Button("메시지") { shareVia(.composeMessage, urls: targets) }
-            Button("Safari 리딩 리스트에 추가") { shareVia(.addToSafariReadingList, urls: targets) }
+            Button(L("메일")) { shareVia(.composeEmail, urls: targets) }
+            Button(L("메시지")) { shareVia(.composeMessage, urls: targets) }
+            Button(L("Safari 리딩 리스트에 추가")) { shareVia(.addToSafariReadingList, urls: targets) }
             Divider()
-            Button("공유 시트 표시…") { showSharingPicker(targets) }
+            Button(L("공유 시트 표시…")) { showSharingPicker(targets) }
         }
-        Button("태그…") { promptTags(targets) }
+        Button(L("태그…")) { promptTags(targets) }
 
         Divider()
 
         // ── Finder
-        Button("Finder에서 보기") { FileSystemService.shared.revealInFinder(item.url) }
-        Button("속성") { showProperties(item) }
+        Button(L("Finder에서 보기")) { FileSystemService.shared.revealInFinder(item.url) }
+        Button(L("속성")) { showProperties(item) }
     }
 
     @ViewBuilder
     private func emptySpaceMenu() -> some View {
-        Menu("보기") {
+        Menu(L("보기")) {
             ForEach(ViewMode.allCases) { mode in
                 Button {
                     nav.viewMode = mode
                 } label: {
                     HStack {
                         if nav.viewMode == mode { Image(systemName: "checkmark") }
-                        Text(mode.rawValue)
+                        Text(L(mode.rawValue))
                     }
                 }
             }
         }
 
-        Menu("정렬 기준") {
+        Menu(L("정렬 기준")) {
             ForEach(SortField.allCases, id: \.self) { field in
                 Button {
                     nav.applySort(field: field, ascending: nav.sortField == field ? nav.sortAscending : true)
                 } label: {
                     HStack {
                         if nav.sortField == field { Image(systemName: "checkmark") }
-                        Text(field.rawValue)
+                        Text(L(field.rawValue))
                     }
                 }
             }
@@ -479,7 +483,7 @@ struct FileListView: View {
             } label: {
                 HStack {
                     if nav.sortAscending { Image(systemName: "checkmark") }
-                    Text("오름차순")
+                    Text(L("오름차순"))
                 }
             }
             Button {
@@ -487,68 +491,68 @@ struct FileListView: View {
             } label: {
                 HStack {
                     if !nav.sortAscending { Image(systemName: "checkmark") }
-                    Text("내림차순")
+                    Text(L("내림차순"))
                 }
             }
         }
 
-        Menu("그룹화 기준") {
+        Menu(L("그룹화 기준")) {
             ForEach(GroupField.allCases, id: \.self) { field in
                 Button {
                     nav.groupField = field
                 } label: {
                     HStack {
                         if nav.groupField == field { Image(systemName: "checkmark") }
-                        Text(field.rawValue)
+                        Text(L(field.rawValue))
                     }
                 }
             }
         }
 
-        Button("새로 고침") { nav.reload() }
+        Button(L("새로 고침")) { nav.reload() }
             .keyboardShortcut("r", modifiers: .command)
 
         Divider()
 
-        Button("붙여넣기") { pasteIntoCurrentFolder() }
+        Button(L("붙여넣기")) { pasteIntoCurrentFolder() }
         .keyboardShortcut("v", modifiers: .command)
         .disabled(!ClipboardService.shared.hasContent)
 
-        Button("바로 가기 붙여넣기") { pasteAsShortcut() }
+        Button(L("바로 가기 붙여넣기")) { pasteAsShortcut() }
             .disabled(!ClipboardService.shared.hasContent)
 
-        Button("실행 취소") { UndoService.shared.undo() }
+        Button(L("실행 취소")) { UndoService.shared.undo() }
             .keyboardShortcut("z", modifiers: .command)
 
         Divider()
 
-        Menu("새로 만들기") {
-            Button("폴더") { createNewFolder() }
+        Menu(L("새로 만들기")) {
+            Button(L("폴더")) { createNewFolder() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Divider()
-            Button("텍스트 문서") { createNewFile(name: "새 텍스트 문서.txt") }
-            Button("Markdown 문서") { createNewFile(name: "새 문서.md") }
-            Button("리치 텍스트 문서") { createNewFile(name: "새 문서.rtf") }
-            Button("Shell 스크립트") { createNewFile(name: "새 스크립트.sh") }
-            Button("HTML 문서") { createNewFile(name: "새 문서.html") }
-            Button("JSON 파일") { createNewFile(name: "새 데이터.json") }
+            Button(L("텍스트 문서")) { createNewFile(name: L("새 텍스트 문서.txt")) }
+            Button(L("Markdown 문서")) { createNewFile(name: L("새 문서.md")) }
+            Button(L("리치 텍스트 문서")) { createNewFile(name: L("새 문서.rtf")) }
+            Button(L("Shell 스크립트")) { createNewFile(name: L("새 스크립트.sh")) }
+            Button(L("HTML 문서")) { createNewFile(name: L("새 문서.html")) }
+            Button(L("JSON 파일")) { createNewFile(name: L("새 데이터.json")) }
         }
 
         Divider()
 
-        Menu("이 폴더 압축") {
+        Menu(L("이 폴더 압축")) {
             if ArchiveService.shared.canCompress(to: .zip) {
-                Button("이 폴더를 Zip으로 압축") {
+                Button(L("이 폴더를 Zip으로 압축")) {
                     compressFolderItself(nav.currentURL, format: .zip)
                 }
             }
             if ArchiveService.shared.canCompress(to: .tarGz) {
-                Button("이 폴더를 tar.gz로 압축") {
+                Button(L("이 폴더를 tar.gz로 압축")) {
                     compressFolderItself(nav.currentURL, format: .tarGz)
                 }
             }
             if ArchiveService.shared.canCompress(to: .sevenZ) {
-                Button("이 폴더를 7z로 압축") {
+                Button(L("이 폴더를 7z로 압축")) {
                     compressFolderItself(nav.currentURL, format: .sevenZ)
                 }
             }
@@ -556,18 +560,18 @@ struct FileListView: View {
 
         Divider()
 
-        Button("폴더에서 새 터미널 열기") { openTerminal(at: nav.currentURL) }
-        Button("현재 경로 복사") { copyToPasteboard(nav.currentURL.path) }
-        Button("Finder에서 열기") { FileSystemService.shared.revealInFinder(nav.currentURL) }
+        Button(L("폴더에서 새 터미널 열기")) { openTerminal(at: nav.currentURL) }
+        Button(L("현재 경로 복사")) { copyToPasteboard(nav.currentURL.path) }
+        Button(L("Finder에서 열기")) { FileSystemService.shared.revealInFinder(nav.currentURL) }
 
         Divider()
 
-        Button("디스플레이 설정") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.displays")!) }
-        Button("개인 설정") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.desktopscreeneffect")!) }
+        Button(L("디스플레이 설정")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.displays")!) }
+        Button(L("개인 설정")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.desktopscreeneffect")!) }
 
         Divider()
 
-        Button("속성") { showFolderProperties(nav.currentURL) }
+        Button(L("속성")) { showFolderProperties(nav.currentURL) }
     }
 
     // MARK: - Menu actions
@@ -641,7 +645,7 @@ struct FileListView: View {
     private func sendToDesktopShortcut(_ urls: [URL]) {
         let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
         for src in urls {
-            let dst = unique("\(src.lastPathComponent) 바로 가기", in: desktop)
+            let dst = unique(Lf("%@ 바로 가기", "\(src.lastPathComponent)"), in: desktop)
             try? FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)
         }
     }
@@ -656,7 +660,7 @@ struct FileListView: View {
         } else if !folderName.isEmpty {
             base = folderName
         } else {
-            base = "압축"
+            base = L("압축")
         }
         return "\(base).\(ext)"
     }
@@ -722,8 +726,8 @@ struct FileListView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.prompt = "선택"
-        panel.message = "압축을 풀 위치를 선택하세요"
+        panel.prompt = L("선택")
+        panel.message = L("압축을 풀 위치를 선택하세요")
         if panel.runModal() == .OK, let dst = panel.url {
             do {
                 try ArchiveService.shared.extract(url, into: dst)
@@ -737,7 +741,7 @@ struct FileListView: View {
     private func testArchive(_ url: URL) {
         do {
             let result = try ArchiveService.shared.testArchive(url)
-            showLongAlert(title: "압축 파일 검사", text: result.isEmpty ? "이상 없음." : result)
+            showLongAlert(title: L("압축 파일 검사"), text: result.isEmpty ? "이상 없음." : result)
         } catch {
             showError("검사 실패", message: error.localizedDescription)
         }
@@ -746,7 +750,7 @@ struct FileListView: View {
     private func archiveInfo(_ url: URL) {
         do {
             let result = try ArchiveService.shared.archiveInfo(url)
-            showLongAlert(title: "압축 파일 정보 — \(url.lastPathComponent)", text: result)
+            showLongAlert(title: Lf("압축 파일 정보 — %@", "\(url.lastPathComponent)"), text: result)
         } catch {
             showError("정보 표시 실패", message: error.localizedDescription)
         }
@@ -781,7 +785,7 @@ struct FileListView: View {
 
     private func openInEditor(_ url: URL, bundleId: String) {
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
-            showError("앱을 찾을 수 없습니다", message: "\(bundleId) 가 설치되지 않았습니다.")
+            showError("앱을 찾을 수 없습니다", message: Lf("%@ 가 설치되지 않았습니다.", "\(bundleId)"))
             return
         }
         NSWorkspace.shared.open([url], withApplicationAt: appURL,
@@ -825,10 +829,10 @@ struct FileListView: View {
     private func promptTags(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = "태그"
-        alert.informativeText = "쉼표로 구분하여 입력하세요 (예: 작업, 중요)."
-        alert.addButton(withTitle: "적용")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = L("태그")
+        alert.informativeText = L("쉼표로 구분하여 입력하세요 (예: 작업, 중요).")
+        alert.addButton(withTitle: L("적용"))
+        alert.addButton(withTitle: L("취소"))
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         let existing = (try? urls[0].resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
         textField.stringValue = existing.joined(separator: ", ")
@@ -850,11 +854,11 @@ struct FileListView: View {
 
     private func permanentDelete(_ urls: [URL]) {
         let alert = NSAlert()
-        alert.messageText = "영구 삭제하시겠습니까?"
-        alert.informativeText = "이 작업은 되돌릴 수 없습니다. \(urls.count)개 항목이 영구적으로 삭제됩니다."
+        alert.messageText = L("영구 삭제하시겠습니까?")
+        alert.informativeText = Lf("이 작업은 되돌릴 수 없습니다. %@개 항목이 영구적으로 삭제됩니다.", "\(urls.count)")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "삭제")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("삭제"))
+        alert.addButton(withTitle: L("취소"))
         if alert.runModal() == .alertFirstButtonReturn {
             for url in urls { try? FileManager.default.removeItem(at: url) }
             nav.selectedItems.subtract(urls)
@@ -868,23 +872,23 @@ struct FileListView: View {
         let alert = NSAlert()
         alert.messageText = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
         var lines: [String] = []
-        lines.append("종류: 폴더")
-        lines.append("경로: \(url.path)")
+        lines.append(L("종류: 폴더"))
+        lines.append(Lf("경로: %@", "\(url.path)"))
         if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
             let f = DateFormatter()
             f.dateFormat = "yyyy-MM-dd HH:mm:ss"
             if let m = values.contentModificationDate {
-                lines.append("수정한 날짜: \(f.string(from: m))")
+                lines.append(Lf("수정한 날짜: %@", "\(f.string(from: m))"))
             }
             if let c = values.creationDate {
-                lines.append("만든 날짜: \(f.string(from: c))")
+                lines.append(Lf("만든 날짜: %@", "\(f.string(from: c))"))
             }
         }
         let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path).count) ?? 0
-        lines.append("항목 수: \(count)")
+        lines.append(Lf("항목 수: %@", "\(count)"))
         alert.informativeText = lines.joined(separator: "\n")
-        alert.addButton(withTitle: "확인")
-        alert.addButton(withTitle: "Finder에서 보기")
+        alert.addButton(withTitle: L("확인"))
+        alert.addButton(withTitle: L("Finder에서 보기"))
         if alert.runModal() == .alertSecondButtonReturn {
             FileSystemService.shared.revealInFinder(url)
         }
@@ -894,17 +898,17 @@ struct FileListView: View {
 
     private func showError(_ title: String, message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("확인"))
         alert.runModal()
     }
 
     private func showLongAlert(title: String, text: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.addButton(withTitle: "확인")
+        alert.messageText = L(title)
+        alert.addButton(withTitle: L("확인"))
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 520, height: 280))
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
@@ -920,7 +924,7 @@ struct FileListView: View {
     private func createAliases(_ urls: [URL]) {
         var created: [URL] = []
         for src in urls {
-            let dst = unique("\(src.lastPathComponent) 바로 가기", in: nav.currentURL)
+            let dst = unique(Lf("%@ 바로 가기", "\(src.lastPathComponent)"), in: nav.currentURL)
             if (try? FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)) != nil {
                 created.append(dst)
             }
@@ -934,7 +938,7 @@ struct FileListView: View {
         let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         guard let urls = pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL] else { return }
         for src in urls {
-            let dst = unique("\(src.lastPathComponent) 바로 가기", in: nav.currentURL)
+            let dst = unique(Lf("%@ 바로 가기", "\(src.lastPathComponent)"), in: nav.currentURL)
             try? FileManager.default.createSymbolicLink(at: dst, withDestinationURL: src)
         }
         nav.reload()
@@ -942,10 +946,10 @@ struct FileListView: View {
 
     private func promptRename(_ url: URL) {
         let alert = NSAlert()
-        alert.messageText = "이름 바꾸기"
-        alert.informativeText = "새 이름을 입력하세요."
-        alert.addButton(withTitle: "확인")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = L("이름 바꾸기")
+        alert.informativeText = L("새 이름을 입력하세요.")
+        alert.addButton(withTitle: L("확인"))
+        alert.addButton(withTitle: L("취소"))
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         textField.stringValue = url.lastPathComponent
         alert.accessoryView = textField
@@ -962,23 +966,23 @@ struct FileListView: View {
         let alert = NSAlert()
         alert.messageText = item.name
         var lines: [String] = []
-        lines.append("종류: \(item.typeDescription)")
-        lines.append("경로: \(item.url.path)")
+        lines.append(Lf("종류: %@", "\(item.typeDescription)"))
+        lines.append(Lf("경로: %@", "\(item.url.path)"))
         if !item.isDirectory {
-            lines.append("크기: \(item.sizeString)")
+            lines.append(Lf("크기: %@", "\(item.sizeString)"))
         }
-        lines.append("수정한 날짜: \(item.modificationString)")
+        lines.append(Lf("수정한 날짜: %@", "\(item.modificationString)"))
         alert.informativeText = lines.joined(separator: "\n")
         alert.icon = item.icon
-        alert.addButton(withTitle: "확인")
-        alert.addButton(withTitle: "Finder에서 보기")
+        alert.addButton(withTitle: L("확인"))
+        alert.addButton(withTitle: L("Finder에서 보기"))
         if alert.runModal() == .alertSecondButtonReturn {
             FileSystemService.shared.revealInFinder(item.url)
         }
     }
 
     private func createNewFolder() {
-        let url = unique("새 폴더", in: nav.currentURL)
+        let url = unique(L("새 폴더"), in: nav.currentURL)
         guard (try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)) != nil else {
             nav.reload()
             return
@@ -1021,10 +1025,10 @@ struct FileListView: View {
             FileSystemService.shared.openItem(target)
         case .broken(let url):
             let alert = NSAlert()
-            alert.messageText = "열 수 없습니다"
-            alert.informativeText = "\(url.lastPathComponent)이(가) 가리키는 대상을 찾을 수 없습니다 (끊어진 바로 가기)."
+            alert.messageText = L("열 수 없습니다")
+            alert.informativeText = Lf("%@이(가) 가리키는 대상을 찾을 수 없습니다 (끊어진 바로 가기).", "\(url.lastPathComponent)")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "확인")
+            alert.addButton(withTitle: L("확인"))
             alert.runModal()
         }
     }
@@ -1088,11 +1092,11 @@ struct FileListView: View {
         let urls = nav.filteredItems.filter { nav.selectedItems.contains($0.url) }.map(\.url)
         guard !urls.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = "즉시 삭제하시겠습니까?"
-        alert.informativeText = "\(urls.count)개 항목이 휴지통을 거치지 않고 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+        alert.messageText = L("즉시 삭제하시겠습니까?")
+        alert.informativeText = Lf("%@개 항목이 휴지통을 거치지 않고 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.", "\(urls.count)")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "삭제")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("삭제"))
+        alert.addButton(withTitle: L("취소"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         var firstErr: Error?
@@ -1116,11 +1120,11 @@ struct FileListView: View {
     /// Does not depend on file selection.
     private func emptyTrash() {
         let alert = NSAlert()
-        alert.messageText = "휴지통을 비우시겠습니까?"
-        alert.informativeText = "휴지통의 모든 항목이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+        alert.messageText = L("휴지통을 비우시겠습니까?")
+        alert.informativeText = L("휴지통의 모든 항목이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "휴지통 비우기")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("휴지통 비우기"))
+        alert.addButton(withTitle: L("취소"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try FileSystemService.shared.emptyTrash()
@@ -1131,10 +1135,10 @@ struct FileListView: View {
 
     private func showSimpleAlert(_ title: String, _ message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: L("확인"))
         alert.runModal()
     }
 
@@ -1150,10 +1154,10 @@ struct FileListView: View {
             nav.reload(thenSelect: [dst])
         } catch {
             let alert = NSAlert()
-            alert.messageText = "이름 바꾸기 실패"
+            alert.messageText = L("이름 바꾸기 실패")
             alert.informativeText = error.localizedDescription
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "확인")
+            alert.addButton(withTitle: L("확인"))
             alert.runModal()
         }
     }

@@ -35,7 +35,7 @@ struct TabBar: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("새 탭 (⌘T)")
+                    .help(L("새 탭 (⌘T)"))
                 }
             }
             .layoutPriority(1)
@@ -67,7 +67,7 @@ struct TabCell: View {
 
     private var displayName: String {
         let name = nav.currentURL.lastPathComponent
-        if name.isEmpty || name == "/" { return "내 PC" }
+        if name.isEmpty || name == "/" { return L("내 PC") }
         return name
     }
 
@@ -140,12 +140,12 @@ struct TabCell: View {
             springWork: $springWork
         ))
         .contextMenu {
-            Button("새 탭")        { onNewTab() }
-            Button("탭 복제")      { onDuplicate() }
+            Button(L("새 탭"))        { onNewTab() }
+            Button(L("탭 복제"))      { onDuplicate() }
             Divider()
-            Button("이 탭 닫기")   { onClose() }
+            Button(L("이 탭 닫기"))   { onClose() }
                 .disabled(!canClose)
-            Button("다른 탭 모두 닫기") { onCloseOthers() }
+            Button(L("다른 탭 모두 닫기")) { onCloseOthers() }
                 .disabled(!canClose)
         }
         .help(nav.currentURL.path)
@@ -307,10 +307,10 @@ private func performTabDrop(urls: [URL], into nav: NavigationState, copy: Bool) 
         }
         if let err, landed.isEmpty {
             let alert = NSAlert()
-            alert.messageText = "드롭 실패"
+            alert.messageText = L("드롭 실패")
             alert.informativeText = err.localizedDescription
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "확인")
+            alert.addButton(withTitle: L("확인"))
             alert.runModal()
         }
     }

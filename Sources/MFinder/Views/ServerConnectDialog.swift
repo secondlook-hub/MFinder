@@ -30,7 +30,7 @@ final class ServerConnectDialog: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        panel.title = "서버에 연결"
+        panel.title = L("서버에 연결")
         panel.isReleasedWhenClosed = false
         panel.level = .modalPanel
         super.init(window: panel)
@@ -67,7 +67,7 @@ final class ServerConnectDialog: NSWindowController {
         content.autoresizingMask = [.width, .height]
         panel.contentView = content
 
-        let intro = NSTextField(labelWithString: "연결할 서버의 주소를 입력하세요. (예: smb://server/share)")
+        let intro = NSTextField(labelWithString: L("연결할 서버의 주소를 입력하세요. (예: smb://server/share)"))
         intro.font = .systemFont(ofSize: 12)
         intro.textColor = .secondaryLabelColor
         intro.frame = NSRect(x: 20, y: 320, width: 440, height: 18)
@@ -82,14 +82,14 @@ final class ServerConnectDialog: NSWindowController {
         urlField.autoresizingMask = [.width, .minYMargin]
         content.addSubview(urlField)
 
-        let recentLabel = NSTextField(labelWithString: "최근 사용한 서버")
+        let recentLabel = NSTextField(labelWithString: L("최근 사용한 서버"))
         recentLabel.font = .systemFont(ofSize: 11, weight: .semibold)
         recentLabel.textColor = .secondaryLabelColor
         recentLabel.frame = NSRect(x: 20, y: 258, width: 200, height: 16)
         recentLabel.autoresizingMask = [.minYMargin]
         content.addSubview(recentLabel)
 
-        let clearBtn = NSButton(title: "모두 지우기", target: self, action: #selector(clearRecents(_:)))
+        let clearBtn = NSButton(title: L("모두 지우기"), target: self, action: #selector(clearRecents(_:)))
         clearBtn.bezelStyle = .inline
         clearBtn.controlSize = .small
         clearBtn.font = .systemFont(ofSize: 11)
@@ -135,14 +135,14 @@ final class ServerConnectDialog: NSWindowController {
         progressIndicator.autoresizingMask = [.maxYMargin]
         content.addSubview(progressIndicator)
 
-        let cancelBtn = NSButton(title: "취소", target: self, action: #selector(cancel(_:)))
+        let cancelBtn = NSButton(title: L("취소"), target: self, action: #selector(cancel(_:)))
         cancelBtn.bezelStyle = .rounded
         cancelBtn.keyEquivalent = "\u{1b}"   // Esc
         cancelBtn.frame = NSRect(x: 260, y: 12, width: 90, height: 28)
         cancelBtn.autoresizingMask = [.minXMargin, .maxYMargin]
         content.addSubview(cancelBtn)
 
-        connectButton = NSButton(title: "연결", target: self, action: #selector(connect(_:)))
+        connectButton = NSButton(title: L("연결"), target: self, action: #selector(connect(_:)))
         connectButton.bezelStyle = .rounded
         connectButton.keyEquivalent = "\r"
         connectButton.frame = NSRect(x: 360, y: 12, width: 100, height: 28)
@@ -159,11 +159,11 @@ final class ServerConnectDialog: NSWindowController {
     @objc private func connect(_ sender: Any?) {
         let raw = urlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty, let url = URL(string: raw), url.scheme != nil else {
-            statusLabel.stringValue = "올바른 서버 주소를 입력하세요. (예: smb://server/share)"
+            statusLabel.stringValue = L("올바른 서버 주소를 입력하세요. (예: smb://server/share)")
             statusLabel.textColor = .systemRed
             return
         }
-        statusLabel.stringValue = "\(raw)에 연결 중…"
+        statusLabel.stringValue = Lf("%@에 연결 중…", "\(raw)")
         statusLabel.textColor = .secondaryLabelColor
         progressIndicator.isHidden = false
         progressIndicator.startAnimation(nil)
@@ -198,10 +198,10 @@ final class ServerConnectDialog: NSWindowController {
 
     @objc private func clearRecents(_ sender: Any?) {
         let alert = NSAlert()
-        alert.messageText = "최근 사용한 서버 목록을 모두 지우시겠습니까?"
+        alert.messageText = L("최근 사용한 서버 목록을 모두 지우시겠습니까?")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "지우기")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("지우기"))
+        alert.addButton(withTitle: L("취소"))
         if alert.runModal() == .alertFirstButtonReturn {
             NetworkConnectService.shared.clearRecent()
             reloadRecent()

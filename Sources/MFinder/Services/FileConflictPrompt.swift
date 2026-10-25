@@ -10,15 +10,15 @@ enum FileConflictChoice { case overwrite, skip, cancel }
 func askFileConflict(name: String, remainingConflicts: Int,
                      blanket: inout FileConflictChoice?) -> FileConflictChoice {
     let alert = NSAlert()
-    alert.messageText = "\"\(name)\"이(가) 이미 있습니다"
-    alert.informativeText = "대상 폴더에 같은 이름의 항목이 있습니다. 덮어쓰면 기존 항목이 삭제되며 되돌릴 수 없습니다."
+    alert.messageText = Lf("\"%@\"이(가) 이미 있습니다", "\(name)")
+    alert.informativeText = L("대상 폴더에 같은 이름의 항목이 있습니다. 덮어쓰면 기존 항목이 삭제되며 되돌릴 수 없습니다.")
     alert.alertStyle = .warning
-    alert.addButton(withTitle: "덮어쓰기")
-    alert.addButton(withTitle: "건너뛰기")
-    alert.addButton(withTitle: "취소")
+    alert.addButton(withTitle: L("덮어쓰기"))
+    alert.addButton(withTitle: L("건너뛰기"))
+    alert.addButton(withTitle: L("취소"))
     if remainingConflicts > 0 {
         alert.showsSuppressionButton = true
-        alert.suppressionButton?.title = "남은 충돌 항목 \(remainingConflicts)개에도 모두 적용"
+        alert.suppressionButton?.title = Lf("남은 충돌 항목 %@개에도 모두 적용", "\(remainingConflicts)")
     }
     let response = alert.runModal()
     let choice: FileConflictChoice

@@ -14,10 +14,10 @@ func promptBatchRename(_ urls: [URL], nav: NavigationState) {
     guard urls.count > 1 else { return }
 
     let alert = NSAlert()
-    alert.messageText = "일괄 이름 바꾸기 (\(urls.count)개 항목)"
-    alert.informativeText = "새 이름을 입력하면 \"새 이름 (1)\", \"새 이름 (2)\"… 순서로 바뀝니다.\n비워 두고 찾기/바꾸기를 입력하면 각 이름에서 해당 문자열만 바뀝니다."
-    alert.addButton(withTitle: "적용")
-    alert.addButton(withTitle: "취소")
+    alert.messageText = Lf("일괄 이름 바꾸기 (%@개 항목)", "\(urls.count)")
+    alert.informativeText = L("새 이름을 입력하면 \"새 이름 (1)\", \"새 이름 (2)\"… 순서로 바뀝니다.\n비워 두고 찾기/바꾸기를 입력하면 각 이름에서 해당 문자열만 바뀝니다.")
+    alert.addButton(withTitle: L("적용"))
+    alert.addButton(withTitle: L("취소"))
 
     func makeLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
@@ -25,14 +25,14 @@ func promptBatchRename(_ urls: [URL], nav: NavigationState) {
         return label
     }
     let newNameField = NSTextField(string: "")
-    newNameField.placeholderString = "예: 휴가 사진"
+    newNameField.placeholderString = L("예: 휴가 사진")
     let startField = NSTextField(string: "1")
     let findField = NSTextField(string: "")
     let replaceField = NSTextField(string: "")
 
     let grid = NSGridView(views: [
-        [makeLabel("새 이름:"), newNameField, makeLabel("시작 번호:"), startField],
-        [makeLabel("찾기:"), findField, makeLabel("바꾸기:"), replaceField],
+        [makeLabel(L("새 이름:")), newNameField, makeLabel(L("시작 번호:")), startField],
+        [makeLabel(L("찾기:")), findField, makeLabel(L("바꾸기:")), replaceField],
     ])
     grid.rowSpacing = 8
     grid.columnSpacing = 6

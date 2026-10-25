@@ -42,13 +42,13 @@ struct AddressBar: View {
         }
         .buttonStyle(NavHoverButtonStyle())
         .disabled(!enabled)
-        .help(help)
+        .help(L(help))
     }
 
     private var breadcrumbOrEditor: some View {
         ZStack {
             if editing {
-                TextField("경로", text: $editedPath, onCommit: commitEdit)
+                TextField(L("경로"), text: $editedPath, onCommit: commitEdit)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .padding(.horizontal, 6)
@@ -120,7 +120,7 @@ struct AddressBar: View {
                     .frame(width: 12, height: 12)
             }
 
-            TextField("\(nav.currentURL.lastPathComponent) 검색", text: $nav.searchText)
+            TextField(Lf("%@ 검색", "\(nav.currentURL.lastPathComponent)"), text: $nav.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
                 .focused($searchFocused)
@@ -142,7 +142,7 @@ struct AddressBar: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { clearHover = $0 }
-                .help(nav.isSearching ? "검색 취소" : "검색 지우기")
+                .help(nav.isSearching ? L("검색 취소") : L("검색 지우기"))
             }
         }
         .padding(.horizontal, 6)

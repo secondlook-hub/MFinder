@@ -55,10 +55,10 @@ struct SidebarView: View {
 @MainActor
 func promptRenameTreeFolder(_ folder: URL, nav: NavigationState, tree: FolderTreeStore) {
     let alert = NSAlert()
-    alert.messageText = "폴더 이름 바꾸기"
-    alert.informativeText = "새 이름을 입력하세요."
-    alert.addButton(withTitle: "확인")
-    alert.addButton(withTitle: "취소")
+    alert.messageText = L("폴더 이름 바꾸기")
+    alert.informativeText = L("새 이름을 입력하세요.")
+    alert.addButton(withTitle: L("확인"))
+    alert.addButton(withTitle: L("취소"))
     let tf = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
     tf.stringValue = folder.lastPathComponent
     alert.accessoryView = tf
@@ -86,11 +86,11 @@ func trashTreeFolders(_ folders: [URL], nav: NavigationState, tree: FolderTreeSt
         return
     }
     let alert = NSAlert()
-    alert.messageText = "\(folders.count)개 폴더를 휴지통으로 보내시겠습니까?"
-    alert.informativeText = "선택한 폴더와 그 안의 모든 내용이 휴지통으로 이동됩니다."
+    alert.messageText = Lf("%@개 폴더를 휴지통으로 보내시겠습니까?", "\(folders.count)")
+    alert.informativeText = L("선택한 폴더와 그 안의 모든 내용이 휴지통으로 이동됩니다.")
     alert.alertStyle = .warning
-    alert.addButton(withTitle: "휴지통으로")
-    alert.addButton(withTitle: "취소")
+    alert.addButton(withTitle: L("휴지통으로"))
+    alert.addButton(withTitle: L("취소"))
     guard alert.runModal() == .alertFirstButtonReturn else { return }
     var firstErr: Error?
     var trashed: [URL] = []
@@ -122,11 +122,11 @@ func trashTreeFolders(_ folders: [URL], nav: NavigationState, tree: FolderTreeSt
 @MainActor
 func trashTreeFolder(_ folder: URL, nav: NavigationState, tree: FolderTreeStore) {
     let alert = NSAlert()
-    alert.messageText = "\(folder.lastPathComponent) 폴더를 휴지통으로 보내시겠습니까?"
-    alert.informativeText = "폴더와 그 안의 모든 내용이 휴지통으로 이동됩니다."
+    alert.messageText = Lf("%@ 폴더를 휴지통으로 보내시겠습니까?", "\(folder.lastPathComponent)")
+    alert.informativeText = L("폴더와 그 안의 모든 내용이 휴지통으로 이동됩니다.")
     alert.alertStyle = .warning
-    alert.addButton(withTitle: "휴지통으로")
-    alert.addButton(withTitle: "취소")
+    alert.addButton(withTitle: L("휴지통으로"))
+    alert.addButton(withTitle: L("취소"))
     guard alert.runModal() == .alertFirstButtonReturn else { return }
     do {
         try FileSystemService.shared.moveToTrash(folder)
@@ -148,10 +148,10 @@ func trashTreeFolder(_ folder: URL, nav: NavigationState, tree: FolderTreeStore)
 @MainActor
 func showTreeAlert(_ title: String, _ message: String) {
     let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = message
+    alert.messageText = L(title)
+    alert.informativeText = L(message)
     alert.alertStyle = .warning
-    alert.addButton(withTitle: "확인")
+    alert.addButton(withTitle: L("확인"))
     alert.runModal()
 }
 
@@ -180,12 +180,12 @@ func uniqueChildURL(_ name: String, in dir: URL) -> URL {
 /// is (label, filename) — `nil` filename means "create a folder named 새 폴더".
 let newItemTemplates: [(label: String, filename: String?)] = [
     ("폴더",            nil),
-    ("텍스트 문서",      "새 텍스트 문서.txt"),
-    ("Markdown 문서",    "새 문서.md"),
-    ("리치 텍스트 문서",  "새 문서.rtf"),
-    ("Shell 스크립트",   "새 스크립트.sh"),
-    ("HTML 문서",        "새 문서.html"),
-    ("JSON 파일",        "새 데이터.json"),
+    ("텍스트 문서",      L("새 텍스트 문서.txt")),
+    ("Markdown 문서",    L("새 문서.md")),
+    ("리치 텍스트 문서",  L("새 문서.rtf")),
+    ("Shell 스크립트",   L("새 스크립트.sh")),
+    ("HTML 문서",        L("새 문서.html")),
+    ("JSON 파일",        L("새 데이터.json")),
 ]
 
 @MainActor
@@ -203,7 +203,7 @@ func createNewFolderShared(in dst: URL, nav: NavigationState, tree: FolderTreeSt
 func createNewFileShared(name: String, in dst: URL, nav: NavigationState, tree: FolderTreeStore) {
     let url = uniqueChildURL(name, in: dst)
     guard FileManager.default.createFile(atPath: url.path, contents: Data()) else {
-        showTreeAlert("파일 만들기 실패", "\(url.path) 에 파일을 만들 수 없습니다.")
+        showTreeAlert("파일 만들기 실패", Lf("%@ 에 파일을 만들 수 없습니다.", "\(url.path)"))
         return
     }
     afterCreating(url, parent: dst, nav: nav, tree: tree)

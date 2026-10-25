@@ -419,8 +419,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 return
             }
             let panel = NSOpenPanel()
-            panel.title = "AirDrop으로 보낼 파일 선택"
-            panel.prompt = "보내기"
+            panel.title = L("AirDrop으로 보낼 파일 선택")
+            panel.prompt = L("보내기")
             panel.canChooseFiles = true
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = true
@@ -462,7 +462,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             icon.image = NSImage(systemSymbolName: id.symbolName, accessibilityDescription: nil)
             icon.contentTintColor = id.symbolColor
             icon.translatesAutoresizingMaskIntoConstraints = false
-            let label = NSTextField(labelWithString: id.rawValue)
+            let label = NSTextField(labelWithString: L(id.rawValue))
             label.font = NSFont.systemFont(ofSize: ThemeService.shared.fontSize, weight: .medium)
             label.textColor = ThemeService.shared.theme.text.nsColor
             label.translatesAutoresizingMaskIntoConstraints = false
@@ -551,7 +551,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             label.font = .systemFont(ofSize: ThemeService.shared.fontSize)
             label.textColor = ThemeService.shared.theme.text.nsColor
             label.translatesAutoresizingMaskIntoConstraints = false
-            label.toolTip = "클릭: 선택한 파일 보내기 · 파일을 끌어다 놓아도 보낼 수 있습니다"
+            label.toolTip = L("클릭: 선택한 파일 보내기 · 파일을 끌어다 놓아도 보낼 수 있습니다")
             cell.addSubview(icon)
             cell.addSubview(label)
             cell.imageView = icon
@@ -574,7 +574,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             icon.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
             icon.contentTintColor = ThemeService.shared.theme.accent.nsColor
             icon.translatesAutoresizingMaskIntoConstraints = false
-            let label = NSTextField(labelWithString: "서버에 연결…")
+            let label = NSTextField(labelWithString: L("서버에 연결…"))
             label.font = .systemFont(ofSize: ThemeService.shared.fontSize)
             label.textColor = ThemeService.shared.theme.accent.nsColor
             label.translatesAutoresizingMaskIntoConstraints = false
@@ -648,7 +648,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 btn.imagePosition = .imageOnly
                 btn.image = NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "꺼내기")
                 btn.contentTintColor = ThemeService.shared.theme.secondaryText.nsColor
-                btn.toolTip = "꺼내기"
+                btn.toolTip = L("꺼내기")
                 btn.translatesAutoresizingMaskIntoConstraints = false
                 cell.addSubview(btn)
                 ejectButton = btn
@@ -1141,7 +1141,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 if s == .favorites {
                     let hiddenCount = PinnedFoldersService.shared.hiddenBuiltinPaths.count
                     if hiddenCount > 0 {
-                        menu.addItem(blockItem("숨긴 기본 항목 복원 (\(hiddenCount)개)") {
+                        menu.addItem(blockItem(Lf("숨긴 기본 항목 복원 (%@개)", "\(hiddenCount)")) {
                             PinnedFoldersService.shared.restoreAllBuiltins()
                         })
                         menu.addItem(.separator())
@@ -1271,8 +1271,8 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             }
             menu.addItem(.separator())
             // Copy / cut respect the multi-selection.
-            let copyTitle = isMulti ? "복사 (\(urls.count)개)" : "복사"
-            let cutTitle  = isMulti ? "잘라내기 (\(urls.count)개)" : "잘라내기"
+            let copyTitle = isMulti ? Lf("복사 (%@개)", "\(urls.count)") : "복사"
+            let cutTitle  = isMulti ? Lf("잘라내기 (%@개)", "\(urls.count)") : "잘라내기"
             menu.addItem(blockItem(copyTitle) { ClipboardService.shared.copy(urls) })
             menu.addItem(blockItem(cutTitle)  { ClipboardService.shared.cut(urls) })
             // Paste destination must be single — into the right-clicked
@@ -1283,7 +1283,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             }
             pasteItem.isEnabled = ClipboardService.shared.hasContent
             menu.addItem(pasteItem)
-            menu.addItem(blockItem(isMulti ? "바로 가기 만들기 (\(urls.count)개)" : "바로 가기 만들기") { [weak self] in
+            menu.addItem(blockItem(isMulti ? Lf("바로 가기 만들기 (%@개)", "\(urls.count)") : "바로 가기 만들기") { [weak self] in
                 guard let self = self else { return }
                 for u in urls { self.createAliasInParent(of: u) }
             })
@@ -1291,7 +1291,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             // design — picking a destination from a multi-selection would be
             // ambiguous.
             if !isMulti {
-                let newItem = NSMenuItem(title: "새로 만들기", action: nil, keyEquivalent: "")
+                let newItem = NSMenuItem(title: L("새로 만들기"), action: nil, keyEquivalent: "")
                 let newMenu = NSMenu()
                 for (idx, tpl) in newItemTemplates.enumerated() {
                     if idx == 1 { newMenu.addItem(.separator()) }
@@ -1317,13 +1317,13 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     self?.nav.renamingURL = url
                 })
             }
-            let nfcTitle = isMulti ? "이름 NFC로 정규화 (\(urls.count)개)…" : "이름 NFC로 정규화…"
+            let nfcTitle = isMulti ? Lf("이름 NFC로 정규화 (%@개)…", "\(urls.count)") : "이름 NFC로 정규화…"
             menu.addItem(blockItem(nfcTitle) { [weak self] in
                 guard let self = self else { return }
                 promptNormalizeNames(urls, nav: self.nav)
             })
-            let trashTitle = isMulti ? "휴지통으로 이동 (\(urls.count)개)" : "휴지통으로 이동"
-            menu.addItem(blockItem(trashTitle) { [weak self] in
+            let trashTitle = isMulti ? Lf("휴지통으로 이동 (%d개)", urls.count) : L("휴지통으로 이동")
+            menu.addItem(blockItem(trashTitle, symbol: "trash") { [weak self] in
                 guard let self = self else { return }
                 trashTreeFolders(urls, nav: self.nav, tree: self.tree)
             })
@@ -1335,11 +1335,11 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             if isMulti {
                 let anyFavorite = urls.contains(where: { PinnedFoldersService.shared.isInFavorites($0) })
                 if anyFavorite {
-                    menu.addItem(blockItem("즐겨찾기에서 제거 (\(urls.count)개)") {
+                    menu.addItem(blockItem(Lf("즐겨찾기에서 제거 (%@개)", "\(urls.count)")) {
                         for u in urls { PinnedFoldersService.shared.removeFromFavorites(u) }
                     })
                 } else if isPinnable {
-                    menu.addItem(blockItem("즐겨찾기에 추가 (\(urls.count)개)") {
+                    menu.addItem(blockItem(Lf("즐겨찾기에 추가 (%@개)", "\(urls.count)")) {
                         for u in urls { PinnedFoldersService.shared.addToFavorites(u) }
                     })
                 }
@@ -1359,7 +1359,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 guard let self = self else { return }
                 for u in urls { self.tree.reloadChildren(of: u) }
             })
-            menu.addItem(blockItem(isMulti ? "Finder에서 보기 (\(urls.count)개)" : "Finder에서 보기") {
+            menu.addItem(blockItem(isMulti ? Lf("Finder에서 보기 (%@개)", "\(urls.count)") : "Finder에서 보기") {
                 for u in urls { FileSystemService.shared.revealInFinder(u) }
             })
             if !isMulti, Self.isEjectableVolume(url) {
@@ -1369,7 +1369,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                 })
             }
             menu.addItem(.separator())
-            menu.addItem(blockItem(isMulti ? "경로 복사 (\(urls.count)개)" : "경로 복사") {
+            menu.addItem(blockItem(isMulti ? Lf("경로 복사 (%@개)", "\(urls.count)") : "경로 복사") {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(urls.map { $0.path }.joined(separator: "\n"), forType: .string)
@@ -1399,13 +1399,13 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             }
 
             func keyField(_ s: String) -> NSTextField {
-                let tf = NSTextField(labelWithString: s)
+                let tf = NSTextField(labelWithString: L(s))
                 tf.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
                 tf.textColor = .secondaryLabelColor
                 return tf
             }
             func valueField(_ s: String) -> NSTextField {
-                let tf = NSTextField(labelWithString: s)
+                let tf = NSTextField(labelWithString: L(s))
                 tf.font = NSFont.systemFont(ofSize: 12)
                 tf.isSelectable = true
                 return tf
@@ -1426,7 +1426,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             grid.frame = NSRect(origin: .zero,
                                 size: NSSize(width: max(fit.width, 320), height: fit.height))
             alert.accessoryView = grid
-            alert.addButton(withTitle: "확인")
+            alert.addButton(withTitle: L("확인"))
 
             // Folder sizes can be expensive; compute off the main thread and
             // patch the label when the value lands. NSAlert's modal run loop
@@ -1499,7 +1499,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         private func createAliasInParent(of folder: URL) {
             let parent = folder.deletingLastPathComponent()
-            let dst = uniqueChildName(in: parent, base: "\(folder.lastPathComponent) 바로 가기")
+            let dst = uniqueChildName(in: parent, base: Lf("%@ 바로 가기", "\(folder.lastPathComponent)"))
             do {
                 try FileManager.default.createSymbolicLink(at: dst, withDestinationURL: folder)
                 tree.reloadChildren(of: parent)
@@ -1527,8 +1527,16 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             return candidate
         }
 
-        private func blockItem(_ title: String, action: @escaping () -> Void) -> NSMenuItem {
-            let item = NSMenuItem(title: title, action: #selector(MenuActionTarget.invoke(_:)), keyEquivalent: "")
+        private func blockItem(_ title: String,
+                               symbol: String? = nil,
+                               action: @escaping () -> Void) -> NSMenuItem {
+            // L() is idempotent on already-localized text (an Lf result that
+            // isn't a Korean key passes through unchanged), so callers may pass
+            // either a raw Korean key or a pre-built Lf string.
+            let item = NSMenuItem(title: L(title), action: #selector(MenuActionTarget.invoke(_:)), keyEquivalent: "")
+            if let symbol {
+                item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            }
             let target = MenuActionTarget(action: action)
             item.representedObject = target
             item.target = target
@@ -1642,10 +1650,10 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
 
         private func presentAlert(_ title: String, _ message: String) {
             let alert = NSAlert()
-            alert.messageText = title
-            alert.informativeText = message
+            alert.messageText = L(title)
+            alert.informativeText = L(message)
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "확인")
+            alert.addButton(withTitle: L("확인"))
             alert.runModal()
         }
     }

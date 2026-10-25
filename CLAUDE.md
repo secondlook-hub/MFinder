@@ -5,7 +5,7 @@ A skim-first orientation for future sessions. Code is the source of truth — th
 ## Project shape
 
 - Native macOS Windows-Explorer-style file manager. SwiftUI shell with AppKit views in the spots where SwiftUI's NSTextField/focus model is unreliable (sidebar tree, details file table).
-- Korean UI throughout. Sidebar sections: **즐겨찾기 / 내 PC / 네트워크**.
+- Multilingual UI (한국어 default + English/日本語/简体中文), switchable at runtime in 설정 → 언어. Korean is the source language and the lookup key everywhere. Sidebar sections: **즐겨찾기 / 내 PC / 네트워크**.
 - Repo: `github.com/secondlook-hub/MFinder` (public). `gh` CLI is authenticated for that org.
 - Min macOS 13. Swift 5.9. Single executable target via Package.swift.
 
@@ -86,6 +86,10 @@ Sources/MFinder/
 │   │     reloads on change (FileTableView tracks lastTheme/lastFontSize,
 │   │     sidebar Coordinator tracks syncedTheme/syncedFontSize — sidebar
 │   │     skips restyle while a rename is active).
+│   ├── LocalizationService.swift Runtime i18n. L()/Lf() global fns look up
+│   │     the Korean source string in the current language's table
+│   │     (Localization+Tables[.generated].swift); Korean is the fallback.
+│   │     @Published current/generation; export/import JSON via 설정 → 언어.
 │   ├── UpdateChecker.swift       GitHub Releases poll, semver compare.
 │   ├── FileOperationService.swift  Background copy/move engine + Explorer-style
 │   │     progress NSPanel (item name, N/M, byte-fraction bar, cancel; panel
@@ -134,6 +138,9 @@ Sources/MFinder/
 ```
 
 ## Patterns to follow
+
+### Adding user-facing strings (i18n)
+Wrap every new Korean UI literal in `L("…")` (or `Lf("…%@…", arg)` for interpolation — pass args stringified: `Lf("%@개", "\(n)")`). If the string goes through a choke point that already calls `L()` internally (menu `block`/`blockItem`, `col.title`, the alert helpers, `FileOperationService.perform(title:)`, `navButton`/`iconButton` help, `keyField`/`valueField`, `colorRow`), just pass the raw Korean key — don't double-wrap. For enum `rawValue`s / theme names used as identity, keep the stored value Korean and localize only at the display site (`L(x.rawValue)`). Then add the Korean key + en/ja/zh-Hans to `Localization+Tables.generated.swift` (or rely on 설정 → 언어 → 불러오기 to patch at runtime). Keys are **runtime** strings (real newlines/quotes), matching the `L()` argument exactly.
 
 ### Adding sidebar tree actions
 Use `Coordinator.actionURLs(for: clickedURL)` to get the operative URL set:
@@ -184,6 +191,7 @@ Wrap the body in `MainActor.assumeIsolated { ... }`. Used by the Dock menu actio
 
 ## Version history (one line)
 
+- v1.28 — 다국어(한/영/일/중) + 삭제 아이콘·단축키. ① `LocalizationService`(Services) — Korean 원문이 곧 조회 키. `L("…")`/`Lf("…%@…", arg)` 전역 함수가 현재 언어 테이블에서 번역을 찾고, 없으면 Korean 폴백. 기본 번역은 `Localization+Tables.generated.swift`에 임베드(SPM 리소스 번들 대신 소스 임베드 — build.sh가 커스텀이라 번들 경로 리스크 회피). 설정 → 언어에서 즉시 전환: `current` 변경이 `generation`을 올리고 ContentView가 `.id(loc.generation)`로 창 내용을 재생성 → 모든 `L()` 재평가(재시작 불필요). 컨텍스트 메뉴/알럿은 on-demand라 다음에 열 때 반영. **메뉴 막대(SwiftUI `.commands`)만 재시작 후 반영**(+ `AppleLanguages`로 AppKit 프레임워크 문자열도 재시작 시 따라옴; Info.plist `CFBundleLocalizations`/build.sh가 ko/en/ja/zh-Hans `.lproj` 생성). **수정 범위 최소화 비결**: `block`/`blockItem`(메뉴), `col.title`, 알럿 헬퍼(`showSimpleAlert`/`showTreeAlert`/`commandAlert`/`alertError`/`presentAlert`/`showError`/`reportFailure`), `FileOperationService.perform(title:)`, `navButton`/`iconButton`(help), `keyField`/`valueField`, `colorRow`가 **내부에서 L()** 하므로 호출부는 Korean 키만 넘기면 됨(수정 불필요). 보간 문자열은 `Lf` + `%@`(모든 인자를 `"\(expr)"`로 문자열화 → 타입 무관 안전). enum rawValue(ViewMode/SortColumn/SidebarSection)·테마 이름은 **키로 유지**하고 표시부에서 `L(rawValue)` — 영속성/비교가 rawValue·path 기준이라 깨지지 않음(핀/숨김은 `hiddenBuiltinPaths` 경로 기준). export/import: 설정에서 번역 전체를 JSON으로 내보내/불러오기(Application Support에 override 영속, 새 언어 코드 추가 가능). ② 우클릭 "휴지통으로 이동"에 `trash` SF Symbol + `⌘D`(Windows Ctrl+D 대응, AppDelegate 전역 모니터가 `.mfinderTrashSelected` 포커스 라우팅; 기존 `⌫`도 유지), "영구 삭제"는 `trash.slash`. **함정**: 번역 키는 **런타임 문자열**(실제 개행·따옴표)이어야 L 인자와 매칭 — 생성기가 `\n`/`\"`를 Swift 소스용으로 이스케이프. 키 집합 검증은 scratchpad에 `keys` 추출 + 생성 테이블 대조 스크립트(소스 `L/Lf` 리터럴 ⊆ en 테이블).
 - v1.27 — 탭에 파일 드롭. `TabBar.swift`의 각 `TabCell`에 `TabDropDelegate: DropDelegate` 추가 — 드롭하면 그 탭의 `nav.currentURL` 폴더로 이동(기본)/복사(⌥), 비활성 탭 위 0.6초 dwell 시 `activate()`로 스프링 로드 전환. 충돌 프롬프트(`askFileConflict`)·자기-폴더 가드·`FileOperationService.perform`·`UndoService.register`·refresh는 사이드바 `acceptDrop`과 동일 로직을 `performTabDrop(urls:into:copy:)`로 복제(@MainActor). `NSItemProvider.loadObject(ofClass: NSURL.self)`로 드롭 순서 보존해 URL 수집. DropDelegate 메서드는 nonisolated이므로 main-큐 완료 콜백에서 `MainActor.assumeIsolated`로 진입.
 - v1.26 — 탭 세션 복원 + 압축/압축 풀기 우클릭 승격 + 마우스 앞/뒤 버튼 신뢰성. ① `TabsState(restore:)`가 `PreferencesService.openTabPaths`/`activeTabIndex`에서 탭을 복원; 탭 추가/삭제/전환·각 탭의 `$currentURL`을 관찰해 저장한다. **함정**: `@Published`는 `willSet`에서 방출하므로 sink 안에서 `currentURL`을 읽으면 *이전* 값이라 탭이 한 단계 전 폴더로 열렸다 — `DispatchQueue.main.async`로 한 틱 미뤄 새 값이 반영된 뒤 저장. `--fresh` 인자(`launchNewMFinderInstance`가 부여, `MFinderLaunch.isFreshInstance`가 판정)를 가진 새 창은 복원하지 않고 홈에서 시작. ② `ArchiveService`(시스템 zip/tar/unzip)로 이미 있던 압축 기능이 "Bandizip" 하위 메뉴에 묻혀 있어 반디집 기능처럼 보였다 — FileTableView/FileListView에서 "압축하기"(기본 zip + 형식 선택)/"압축 풀기"(단일 압축 파일)로 승격, 실제 반디집 연동은 보내기 → Bandizip에만 남김. ③ 마우스 사이드 버튼 모니터를 `.otherMouseUp` 단독 → `[.otherMouseDown, .otherMouseUp]`로 바꿔 누르는 순간(down)에 네비게이트하고 up도 소비 — 파일 테이블/사이드바가 down을 처리할 때 up이 로컬 모니터에 안 잡히던 문제 해결.
 - v1.1 — Initial release.

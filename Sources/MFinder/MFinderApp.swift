@@ -18,7 +18,7 @@ struct MFinderApp: App {
             // being edited, forward to its own undo manager so typing undo
             // keeps working; otherwise revert the last file operation.
             CommandGroup(replacing: .undoRedo) {
-                Button("실행 취소") {
+                Button(L("실행 취소")) {
                     if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
                        let um = textView.undoManager, um.canUndo {
                         um.undo()
@@ -26,7 +26,7 @@ struct MFinderApp: App {
                         UndoService.shared.undo()
                     }
                 }.keyboardShortcut("z", modifiers: .command)
-                Button("다시 실행") {
+                Button(L("다시 실행")) {
                     if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
                        let um = textView.undoManager, um.canRedo {
                         um.redo()
@@ -36,17 +36,17 @@ struct MFinderApp: App {
                 }.keyboardShortcut("z", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .newItem) {
-                Button("새 창") {
+                Button(L("새 창")) {
                     launchNewMFinderInstance()
                 }.keyboardShortcut("n", modifiers: .command)
-                Button("새 탭") {
+                Button(L("새 탭")) {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
                 }.keyboardShortcut("t", modifiers: .command)
                 Divider()
                 // Finder-style 정보 가져오기: routed by focus area — the file
                 // list shows the selected item's 속성, the sidebar tree shows
                 // its own dialog (with async folder size).
-                Button("정보 가져오기") {
+                Button(L("정보 가져오기")) {
                     NotificationCenter.default.post(name: .mfinderGetInfo, object: nil)
                 }.keyboardShortcut("i", modifiers: .command)
             }
@@ -56,25 +56,25 @@ struct MFinderApp: App {
             // the window (and quitting, via terminate-after-last-window)
             // instead of the tab.
             CommandGroup(replacing: .saveItem) {
-                Button("탭 닫기") {
+                Button(L("탭 닫기")) {
                     NotificationCenter.default.post(name: .mfinderCloseTab, object: nil)
                 }.keyboardShortcut("w", modifiers: .command)
-                Button("창 닫기") {
+                Button(L("창 닫기")) {
                     NSApp.keyWindow?.performClose(nil)
                 }.keyboardShortcut("w", modifiers: [.command, .shift])
             }
-            CommandMenu("탭") {
-                Button("새 탭") {
+            CommandMenu(L("탭")) {
+                Button(L("새 탭")) {
                     NotificationCenter.default.post(name: .mfinderNewTab, object: nil)
                 }.keyboardShortcut("t", modifiers: .command)
-                Button("탭 닫기") {
+                Button(L("탭 닫기")) {
                     NotificationCenter.default.post(name: .mfinderCloseTab, object: nil)
                 }.keyboardShortcut("w", modifiers: .command)
                 Divider()
-                Button("다음 탭") {
+                Button(L("다음 탭")) {
                     NotificationCenter.default.post(name: .mfinderNextTab, object: nil)
                 }.keyboardShortcut("]", modifiers: [.command, .shift])
-                Button("이전 탭") {
+                Button(L("이전 탭")) {
                     NotificationCenter.default.post(name: .mfinderPrevTab, object: nil)
                 }.keyboardShortcut("[", modifiers: [.command, .shift])
             }
@@ -84,37 +84,37 @@ struct MFinderApp: App {
             // English system one.
             CommandGroup(after: .toolbar) {
                 Divider()
-                Button("미리 보기 패널") {
+                Button(L("미리 보기 패널")) {
                     AppUIState.shared.showPreviewPane.toggle()
                 }.keyboardShortcut("p", modifiers: [.command, .shift])
                 Divider()
-                Button("글자 크게") {
+                Button(L("글자 크게")) {
                     ThemeService.shared.increaseFontSize()
                 }.keyboardShortcut("=", modifiers: .command)
-                Button("글자 작게") {
+                Button(L("글자 작게")) {
                     ThemeService.shared.decreaseFontSize()
                 }.keyboardShortcut("-", modifiers: .command)
-                Button("글자 기본 크기") {
+                Button(L("글자 기본 크기")) {
                     ThemeService.shared.resetFontSize()
                 }.keyboardShortcut("0", modifiers: .command)
             }
-            CommandMenu("이동") {
-                Button("뒤로") {
+            CommandMenu(L("이동")) {
+                Button(L("뒤로")) {
                     NotificationCenter.default.post(name: .mfinderGoBack, object: nil)
                 }.keyboardShortcut("[", modifiers: .command)
-                Button("앞으로") {
+                Button(L("앞으로")) {
                     NotificationCenter.default.post(name: .mfinderGoForward, object: nil)
                 }.keyboardShortcut("]", modifiers: .command)
-                Button("위로") {
+                Button(L("위로")) {
                     NotificationCenter.default.post(name: .mfinderGoUp, object: nil)
                 }.keyboardShortcut(.upArrow, modifiers: [.command])
                 Divider()
-                Button("서버에 연결…") {
+                Button(L("서버에 연결…")) {
                     NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
                 }.keyboardShortcut("k", modifiers: .command)
             }
             CommandGroup(replacing: .help) {
-                Button("업데이트 확인…") {
+                Button(L("업데이트 확인…")) {
                     Task { await updateChecker.checkForUpdates(manual: true) }
                 }
             }
@@ -189,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// "Hide", and "Quit" entries.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
-        let item = NSMenuItem(title: "새 창 열기", action: #selector(openNewInstanceFromDock(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: L("새 창 열기"), action: #selector(openNewInstanceFromDock(_:)), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return menu
@@ -249,6 +249,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 default:
                     break
                 }
+            }
+
+            // ⌘D — move selection to Trash (mirrors Windows Explorer's Ctrl+D
+            // delete-to-Recycle-Bin). Focus-routed like ⌫ via the same
+            // notification; the file list and sidebar handlers guard on their
+            // own AppFocus area.
+            if mods == [.command],
+               let chars = event.charactersIgnoringModifiers, chars == "d" {
+                NotificationCenter.default.post(name: .mfinderTrashSelected, object: nil)
+                return nil
             }
 
             // Delete keys (51 = Backspace, 117 = Forward Delete from extended/external keyboards)

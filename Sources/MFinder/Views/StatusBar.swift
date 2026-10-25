@@ -14,20 +14,20 @@ struct StatusBar: View {
                 if nav.isSearching {
                     HStack(spacing: 4) {
                         ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
-                        Text("\"\(nav.searchText)\" 검색 중… (\(total)개 발견)")
+                        Text(Lf("\"%@\" 검색 중… (%@개 발견)", "\(nav.searchText)", "\(total)"))
                     }
                 } else {
-                    Text("\"\(nav.searchText)\" 검색 결과 \(total)개")
+                    Text(Lf("\"%@\" 검색 결과 %@개", "\(nav.searchText)", "\(total)"))
                 }
-                if sel > 0 { Text("• \(sel)개 선택") }
+                if sel > 0 { Text(Lf("• %@개 선택", "\(sel)")) }
             } else if sel > 0 {
-                Text("\(sel)개 항목 선택")
+                Text(Lf("%@개 항목 선택", "\(sel)"))
                 if let first = nav.filteredItems.first(where: { nav.selectedItems.contains($0.url) }), !first.isDirectory {
                     Text("•")
                     Text(first.sizeString)
                 }
             } else {
-                Text("\(total)개 항목")
+                Text(Lf("%@개 항목", "\(total)"))
             }
             if !clipboard.stack.isEmpty {
                 Text("•")
@@ -87,7 +87,7 @@ struct StatusBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("클릭해서 스택 내용을 보고 한 번에 붙여넣기")
+        .help(L("클릭해서 스택 내용을 보고 한 번에 붙여넣기"))
         .popover(isPresented: $showStackPopover, arrowEdge: .bottom) {
             ClipboardStackView()
                 .environmentObject(nav)
@@ -105,9 +105,9 @@ struct StatusBar: View {
     private var clipboardLabel: String {
         let count = clipboard.stack.count
         switch clipboard.dominantMode {
-        case .some(true):  return "잘라낸 항목 \(count)개 대기"
-        case .some(false): return "복사한 항목 \(count)개 대기"
-        case .none:        return "복사/잘라낸 항목 \(count)개 대기"
+        case .some(true):  return Lf("잘라낸 항목 %@개 대기", "\(count)")
+        case .some(false): return Lf("복사한 항목 %@개 대기", "\(count)")
+        case .none:        return Lf("복사/잘라낸 항목 %@개 대기", "\(count)")
         }
     }
 }
