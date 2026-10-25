@@ -113,6 +113,10 @@ struct MFinderApp: App {
                 }.keyboardShortcut(.upArrow, modifiers: [.command])
                 Divider()
                 Menu(L("최근 폴더")) { RecentFoldersMenu() }
+                Menu(L("저장된 검색")) { SavedSearchesMenu() }
+                Button(L("현재 검색 저장…")) {
+                    NotificationCenter.default.post(name: .mfinderSaveSearch, object: nil)
+                }
                 Divider()
                 Button(L("서버에 연결…")) {
                     NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
@@ -150,6 +154,8 @@ extension Notification.Name {
     static let mfinderTreePaste         = Notification.Name("mfinder.treePaste")
     static let mfinderConnectToServer   = Notification.Name("mfinder.connectToServer")
     static let mfinderNavigateTo        = Notification.Name("mfinder.navigateTo")
+    static let mfinderSaveSearch        = Notification.Name("mfinder.saveSearch")
+    static let mfinderRunSearch         = Notification.Name("mfinder.runSearch")
     static let mfinderGetInfo           = Notification.Name("mfinder.getInfo")
 }
 

@@ -61,6 +61,15 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .mfinderNavigateTo)) { notif in
             if let url = notif.object as? URL { tabs.active.navigate(to: url) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderSaveSearch)) { _ in
+            saveCurrentSearch()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderRunSearch)) { notif in
+            guard let s = notif.object as? SavedSearch else { return }
+            tabs.active.navigate(to: s.scopeURL)
+            let query = s.query
+            DispatchQueue.main.async { tabs.active.searchText = query }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderConnectToServer)) { _ in
             ServerConnectDialog.shared.present { mountedURL in
                 tabs.newTab(at: mountedURL)
@@ -97,6 +106,32 @@ struct ContentView: View {
             Button(L("확인"), role: .cancel) {}
         } message: {
             Text(Lf("MFinder %@이(가) 최신 버전입니다.", "\(updateChecker.currentVersion)"))
+        }
+    }
+
+    /// Prompt for a name and save the active tab's current search as a smart
+    /// folder. No-op with an explainer when nothing is being searched.
+    private func saveCurrentSearch() {
+        let tab = tabs.active
+        let query = tab.searchText
+        let alert = NSAlert()
+        guard !query.isEmpty else {
+            alert.messageText = L("저장할 검색이 없습니다")
+            alert.informativeText = L("먼저 검색을 입력한 다음 저장하세요.")
+            alert.addButton(withTitle: L("확인"))
+            alert.runModal()
+            return
+        }
+        alert.messageText = L("검색 저장")
+        alert.informativeText = L("이 검색의 이름을 입력하세요.")
+        alert.addButton(withTitle: L("저장"))
+        alert.addButton(withTitle: L("취소"))
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.stringValue = query
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        if alert.runModal() == .alertFirstButtonReturn {
+            SavedSearchService.shared.add(name: field.stringValue, query: query, scope: tab.currentURL)
         }
     }
 }

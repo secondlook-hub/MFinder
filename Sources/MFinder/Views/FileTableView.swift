@@ -1454,6 +1454,7 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         menu.addItem(block(urls.count > 1 ? Lf("선택 항목으로 새 폴더 (%@개)", "\(urls.count)") : "선택 항목으로 새 폴더", symbol: "folder.badge.plus") { [weak self] in
             self?.newFolderWithSelection(urls)
         })
+        if let qa = quickActionsItem(urls) { menu.addItem(qa) }
         menu.addItem(.separator())
         menu.addItem(block("휴지통으로 이동", key: "d", modifiers: .command, symbol: "trash") { [weak self] in
             self?.moveToTrash(urls)
@@ -2032,6 +2033,42 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         }
         UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
         parent.nav.reload(thenSelect: [url])
+    }
+
+    /// Quick Actions submenu, present only when the selection has image files.
+    private func quickActionsItem(_ urls: [URL]) -> NSMenuItem? {
+        let images = urls.filter(QuickActionsService.isImage)
+        guard !images.isEmpty else { return nil }
+        let item = NSMenuItem(title: L("빠른 동작"), action: nil, keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: nil)
+        let sub = NSMenu()
+        sub.addItem(block("오른쪽으로 회전", symbol: "rotate.right") { [weak self] in self?.rotateImages(images, clockwise: true) })
+        sub.addItem(block("왼쪽으로 회전", symbol: "rotate.left") { [weak self] in self?.rotateImages(images, clockwise: false) })
+        sub.addItem(.separator())
+        sub.addItem(block("PDF 만들기", symbol: "doc.richtext") { [weak self] in self?.makePDF(images) })
+        item.submenu = sub
+        return item
+    }
+
+    private func rotateImages(_ urls: [URL], clockwise: Bool) {
+        var failed: Error?
+        for u in urls {
+            do { try QuickActionsService.rotate(u, clockwise: clockwise) } catch { failed = error }
+        }
+        parent.nav.reload()
+        if let failed { alertError("회전 실패", message: failed.localizedDescription) }
+    }
+
+    private func makePDF(_ urls: [URL]) {
+        do {
+            let name = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent
+                                       : parent.nav.currentURL.lastPathComponent
+            let out = try QuickActionsService.createPDF(from: urls, named: name)
+            UndoService.shared.register(.create(urls: [out]), label: "PDF 만들기")
+            parent.nav.reload(thenSelect: [out])
+        } catch {
+            alertError("PDF 만들기 실패", message: error.localizedDescription)
+        }
     }
 
     /// Finder-style ⌘D: copy each selected item next to itself as "name (2)".

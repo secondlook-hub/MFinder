@@ -49,6 +49,8 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Show/Hide Extensions** — 보기 → "모든 확장자 표시" (or 설정 → 모든 파일 확장자 표시) toggles filename extensions across every view; renaming always edits the full name
 - **Breadcrumb Drill-Down** — Click the chevron after any breadcrumb to drop down that folder's subfolders and jump straight in, Explorer-style
 - **Recent Folders** — 이동 → 최근 폴더 lists the folders you visited most recently (persisted across launches)
+- **Quick Actions** — Right-click an image selection → 빠른 동작: rotate left/right (re-encoded in place) or combine images into a PDF
+- **Smart Folders (Saved Searches)** — 이동 → 현재 검색 저장… names and stores the current Spotlight search; 이동 → 저장된 검색 re-runs any saved search in its original folder scope
 - **Undo / Redo (⌘Z / ⇧⌘Z)** — Reverts paste, drag move/copy, rename (single + batch), 새로 만들기, 바로 가기 만들기, and 휴지통 이동 (restores from the Trash), up to 50 steps
 - **Group By** — 그룹화 기준 in the details view: 이름 / 수정한 날짜(오늘·어제·이번 주…) / 유형 / 크기 buckets / 만든 날짜 / 확장명, with item counts per group header
 - **Preview Pane (⇧⌘P)** — Docked Quick Look preview + key attributes on the right, updating with the selection

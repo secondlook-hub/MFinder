@@ -383,6 +383,17 @@ struct FileListView: View {
         } label: {
             Label(targets.count > 1 ? Lf("선택 항목으로 새 폴더 (%@개)", "\(targets.count)") : L("선택 항목으로 새 폴더"), systemImage: "folder.badge.plus")
         }
+        let images = targets.filter(QuickActionsService.isImage)
+        if !images.isEmpty {
+            Menu {
+                Button { rotateImages(images, clockwise: true) } label: { Label(L("오른쪽으로 회전"), systemImage: "rotate.right") }
+                Button { rotateImages(images, clockwise: false) } label: { Label(L("왼쪽으로 회전"), systemImage: "rotate.left") }
+                Divider()
+                Button { makePDF(images) } label: { Label(L("PDF 만들기"), systemImage: "doc.richtext") }
+            } label: {
+                Label(L("빠른 동작"), systemImage: "wand.and.stars")
+            }
+        }
         Divider()
         Button(role: .destructive) {
             var trashed: [URL] = []
@@ -1012,6 +1023,27 @@ struct FileListView: View {
             UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
         }
         nav.reload()
+    }
+
+    private func rotateImages(_ urls: [URL], clockwise: Bool) {
+        var failed: Error?
+        for u in urls {
+            do { try QuickActionsService.rotate(u, clockwise: clockwise) } catch { failed = error }
+        }
+        nav.reload()
+        if let failed { showError("회전 실패", message: failed.localizedDescription) }
+    }
+
+    private func makePDF(_ urls: [URL]) {
+        do {
+            let name = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent
+                                       : nav.currentURL.lastPathComponent
+            let out = try QuickActionsService.createPDF(from: urls, named: name)
+            UndoService.shared.register(.create(urls: [out]), label: "PDF 만들기")
+            nav.reload(thenSelect: [out])
+        } catch {
+            showError("PDF 만들기 실패", message: error.localizedDescription)
+        }
     }
 
     /// Finder-style ⌘D: copy each selected item next to itself as "name (2)".

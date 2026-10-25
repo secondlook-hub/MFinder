@@ -13,7 +13,9 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("NetFS"),
                 .linkedFramework("Quartz"),
-                .linkedFramework("QuickLookThumbnailing")
+                .linkedFramework("QuickLookThumbnailing"),
+                .linkedFramework("PDFKit"),
+                .linkedFramework("ImageIO")
             ]
         )
     ]
