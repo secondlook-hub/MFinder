@@ -37,7 +37,7 @@ fi
 # MFinder's own UI is localized at runtime by LocalizationService; these empty
 # .lproj dirs just let AppKit's own framework strings follow AppleLanguages
 # (set by the in-app language picker on relaunch). ko stays first/default.
-for lang in ko en ja zh-Hans; do
+for lang in ko en ja zh-Hans zh-Hant es fr de it pt-BR ru nl pl tr vi id ar hi; do
     mkdir -p "$APP_BUNDLE/Contents/Resources/$lang.lproj"
 done
 

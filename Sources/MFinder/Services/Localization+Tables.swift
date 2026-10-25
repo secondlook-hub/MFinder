@@ -11,7 +11,21 @@ enum LocalizationTables {
         "en": en,
         "ja": ja,
         "zh-Hans": zhHans,
+        "zh-Hant": zhHant,
+        "es": es,
+        "fr": fr,
+        "de": de,
+        "it": it,
+        "pt-BR": ptBR,
+        "ru": ru,
+        "nl": nl,
+        "pl": pl,
+        "tr": tr,
+        "vi": vi,
+        "id": idn,
+        "ar": ar,
+        "hi": hi,
     ]
 
-    // Populated in Localization+Tables.generated.swift
+    // Each language dictionary is defined in Localization+Tables.generated.swift
 }

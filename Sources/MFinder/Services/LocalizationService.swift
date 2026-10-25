@@ -31,20 +31,51 @@ final class LocalizationService: ObservableObject {
         case en
         case ja
         case zhHans = "zh-Hans"
+        case zhHant = "zh-Hant"
+        case es
+        case fr
+        case de
+        case it
+        case ptBR = "pt-BR"
+        case ru
+        case nl
+        case pl
+        case tr
+        case vi
+        case ind = "id"
+        case ar
+        case hi
 
         var id: String { rawValue }
 
-        /// Name shown in the Settings picker (always in that language's own
-        /// script, except 시스템 which follows the UI).
+        /// Name shown in the Settings picker — each language in its own script,
+        /// except 시스템 which follows the current UI language.
         var menuLabel: String {
-            switch self {
-            case .system: return L("시스템 언어 (자동)")
-            case .ko:     return "한국어"
-            case .en:     return "English"
-            case .ja:     return "日本語"
-            case .zhHans: return "简体中文"
-            }
+            if self == .system { return L("시스템 언어 (자동)") }
+            return Self.nativeNames[rawValue] ?? rawValue
         }
+
+        /// Native display names, keyed by language code.
+        static let nativeNames: [String: String] = [
+            "ko": "한국어",
+            "en": "English",
+            "ja": "日本語",
+            "zh-Hans": "简体中文",
+            "zh-Hant": "繁體中文",
+            "es": "Español",
+            "fr": "Français",
+            "de": "Deutsch",
+            "it": "Italiano",
+            "pt-BR": "Português (Brasil)",
+            "ru": "Русский",
+            "nl": "Nederlands",
+            "pl": "Polski",
+            "tr": "Türkçe",
+            "vi": "Tiếng Việt",
+            "id": "Bahasa Indonesia",
+            "ar": "العربية",
+            "hi": "हिन्दी",
+        ]
     }
 
     private static let defaultsKey = "mfinder.language"
@@ -106,9 +137,10 @@ final class LocalizationService: ObservableObject {
     /// surfaced separately via `customCodes`.
     var availableLanguages: [Language] { Language.allCases }
 
-    /// Non-built-in language codes introduced by an import (e.g. "fr", "de").
+    /// Non-built-in language codes introduced by an import (shown separately
+    /// in the picker). Built-in codes are covered by the Language enum.
     var customCodes: [String] {
-        let known = Set(["ko", "en", "ja", "zh-Hans"])
+        let known = Set(Language.allCases.map(\.rawValue))
         return tables.keys.filter { !known.contains($0) }.sorted()
     }
 
@@ -122,38 +154,33 @@ final class LocalizationService: ObservableObject {
     }
 
     private static func resolve(_ lang: Language, tables: [String: [String: String]]) -> String {
-        switch lang {
-        case .ko:     return "ko"
-        case .en:     return "en"
-        case .ja:     return "ja"
-        case .zhHans: return "zh-Hans"
-        case .system:
-            // Follow the OS preferred-language order; fall back to English for
-            // languages we don't ship (Korean is the key, English the broadest
-            // translation we provide).
-            for pref in Locale.preferredLanguages {
-                let code = pref.lowercased()
-                if code.hasPrefix("ko") { return "ko" }
-                if code.hasPrefix("ja") { return "ja" }
-                if code.hasPrefix("zh-hant") || code.hasPrefix("zh-tw") || code.hasPrefix("zh-hk") {
-                    // No Traditional table shipped; use Simplified if present.
-                    return tables["zh-Hant"] != nil ? "zh-Hant" : "zh-Hans"
+        guard lang == .system else { return lang.rawValue }
+        // Follow the OS preferred-language order; fall back to English for
+        // languages we don't ship (Korean is the key, English the broadest
+        // translation we provide).
+        let shipped = Set(tables.keys).union(["ko", "en"])
+        for pref in Locale.preferredLanguages {
+            let code = pref.lowercased()
+            if code.hasPrefix("zh") {
+                if code.contains("hant") || code.contains("-tw") || code.contains("-hk") || code.contains("-mo") {
+                    if shipped.contains("zh-Hant") { return "zh-Hant" }
                 }
-                if code.hasPrefix("zh") { return "zh-Hans" }
-                if code.hasPrefix("en") { return "en" }
+                if shipped.contains("zh-Hans") { return "zh-Hans" }
+                if shipped.contains("zh-Hant") { return "zh-Hant" }
             }
-            return "en"
+            if code.hasPrefix("pt"), shipped.contains("pt-BR") { return "pt-BR" }
+            // Primary subtag (e.g. "en-US" → "en").
+            let primary = String(code.prefix(while: { $0 != "-" }))
+            if shipped.contains(primary) { return primary }
         }
+        return "en"
     }
 
     private func applyAppleLanguages(for lang: Language) {
-        switch lang {
-        case .system:
+        if lang == .system {
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        case .ko:     applyAppleLanguages(code: "ko")
-        case .en:     applyAppleLanguages(code: "en")
-        case .ja:     applyAppleLanguages(code: "ja")
-        case .zhHans: applyAppleLanguages(code: "zh-Hans")
+        } else {
+            applyAppleLanguages(code: lang.rawValue)
         }
     }
 

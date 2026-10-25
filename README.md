@@ -48,7 +48,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Batch Rename** — Multi-select → right-click → 일괄 이름 바꾸기: number sequentially from a base name, or find/replace inside names; one ⌘Z undoes the whole batch
 - **AirDrop** — Sidebar AirDrop row: click to send the current selection (or pick files), or drag files onto it; also in 공유/보내기 context menus
 - **Type-Ahead** — Typing in the details view jumps to the next matching filename
-- **Multilingual UI** — 한국어 (default) / English / 日本語 / 简体中文, switchable at runtime in 설정 (⌘,) → 언어 (defaults to the system language). The window updates instantly; the menu bar follows after a relaunch. Korean is the source language, so anything untranslated gracefully falls back to Korean. Translations can be exported to a JSON file, edited (or extended with a brand-new language), and imported back — no rebuild needed
+- **Multilingual UI** — 17 languages: 한국어 (default), English, 日本語, 简体中文, 繁體中文, Español, Français, Deutsch, Italiano, Português (Brasil), Русский, Nederlands, Polski, Türkçe, Tiếng Việt, Bahasa Indonesia, العربية, हिन्दी. Switch at runtime in 설정 (⌘,) → 언어 (defaults to the system language). The window updates instantly; the menu bar follows after a relaunch. Korean is the source language, so anything untranslated gracefully falls back to Korean. Translations can be exported to a JSON file, edited (or extended with a brand-new language), and imported back — no rebuild needed
 
 ## Install
 
