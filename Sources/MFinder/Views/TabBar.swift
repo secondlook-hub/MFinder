@@ -283,6 +283,10 @@ private func performTabDrop(urls: [URL], into nav: NavigationState, copy: Bool) 
                                                         blanket: &blanket)
                 if choice == .skip { continue }
                 if choice == .cancel { break }
+                if choice == .keepBoth {
+                    ops.append(FileOperation(src: src, dst: uniqueChild(base: src.lastPathComponent), isMove: !copy))
+                    continue
+                }
                 try? fm.removeItem(at: plain)
             }
             target = plain

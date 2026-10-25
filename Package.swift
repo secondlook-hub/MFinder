@@ -12,7 +12,8 @@ let package = Package(
             path: "Sources/MFinder",
             linkerSettings: [
                 .linkedFramework("NetFS"),
-                .linkedFramework("Quartz")
+                .linkedFramework("Quartz"),
+                .linkedFramework("QuickLookThumbnailing")
             ]
         )
     ]

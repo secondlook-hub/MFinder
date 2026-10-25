@@ -157,6 +157,12 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                                                             blanket: &blanket)
                     if choice == .skip { continue }
                     if choice == .cancel { cancelledAtIndex = idx; break }
+                    if choice == .keepBoth {
+                        ops.append(FileOperation(src: entry.url,
+                                                 dst: uniqueDestination(for: entry.url, in: destination),
+                                                 isMove: true))
+                        continue
+                    }
                     try? fm.removeItem(at: target)
                 }
                 ops.append(FileOperation(src: entry.url, dst: target, isMove: true))
@@ -174,6 +180,12 @@ final class ClipboardService: ObservableObject, @unchecked Sendable {
                                                             blanket: &blanket)
                     if choice == .skip { continue }
                     if choice == .cancel { cancelledAtIndex = idx; break }
+                    if choice == .keepBoth {
+                        ops.append(FileOperation(src: entry.url,
+                                                 dst: uniqueDestination(for: entry.url, in: destination),
+                                                 isMove: false))
+                        continue
+                    }
                     try? fm.removeItem(at: target)
                 }
                 ops.append(FileOperation(src: entry.url, dst: target, isMove: false))

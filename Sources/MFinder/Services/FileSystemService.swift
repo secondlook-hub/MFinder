@@ -66,7 +66,9 @@ final class FileSystemService {
             // one lookup covers every cloud folder. Folding these into the
             // existing fetch keeps it at one resourceValues call per item —
             // no extra stat(2) per row.
-            .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey
+            .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey,
+            // Finder color tag → shown as a dot. Folded into the same fetch.
+            .labelColorKey, .tagNamesKey
         ]
         guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
         let isDir = values.isDirectory ?? false
@@ -87,8 +89,20 @@ final class FileSystemService {
             creationDate: values.creationDate ?? Date(),
             typeDescription: values.localizedTypeDescription ?? (isDir ? L("파일 폴더") : L("파일")),
             icon: icon(for: url, isDirectory: isDir, cloudState: cloudState),
-            cloudState: cloudState
+            cloudState: cloudState,
+            labelColor: Self.tagColor(values)
         )
+    }
+
+    /// A display color for the item's Finder tag: the label color when set,
+    /// otherwise nil (text-only tags carry no color). Reading `.labelColorKey`
+    /// avoids depending on localized tag names.
+    private static func tagColor(_ values: URLResourceValues) -> NSColor? {
+        if let c = values.labelColor { return c }
+        // Fall back to "has any tag" → a neutral gray dot, so purely named
+        // tags still show they're tagged.
+        if let names = values.tagNames, !names.isEmpty { return .systemGray }
+        return nil
     }
 
     /// Icon for a row, badged when the item is online-only.

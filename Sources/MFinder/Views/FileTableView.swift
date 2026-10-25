@@ -794,6 +794,12 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
                                                             blanket: &blanket)
                     if choice == .skip { continue }
                     if choice == .cancel { break }
+                    if choice == .keepBoth {
+                        ops.append(FileOperation(src: src,
+                                                 dst: uniqueDestinationName(src.lastPathComponent, in: dst),
+                                                 isMove: shouldMove))
+                        continue
+                    }
                     try? FileManager.default.removeItem(at: plainTarget)
                 }
                 target = plainTarget
@@ -1013,7 +1019,7 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             tf.font = NSFont.systemFont(ofSize: theming.fontSize)
             tf.textColor = theming.theme.text.nsColor
         }
-        cell.imageView?.image = item.icon
+        cell.imageView?.image = Self.iconWithTagDot(item)
         cell.textField?.stringValue = item.name
         // The badge alone doesn't say what it means; spell it out on hover.
         cell.toolTip = item.isNotDownloaded
@@ -1436,6 +1442,14 @@ extension FileTableView.Coordinator: NSMenuDelegate {
             guard let self else { return }
             promptNormalizeNames(urls, nav: self.parent.nav)
         })
+        menu.addItem(.separator())
+        menu.addItem(block(urls.count > 1 ? Lf("복제 (%@개)", "\(urls.count)") : "복제", symbol: "plus.square.on.square") { [weak self] in
+            self?.duplicateItems(urls)
+        })
+        menu.addItem(block(urls.count > 1 ? Lf("선택 항목으로 새 폴더 (%@개)", "\(urls.count)") : "선택 항목으로 새 폴더", symbol: "folder.badge.plus") { [weak self] in
+            self?.newFolderWithSelection(urls)
+        })
+        menu.addItem(.separator())
         menu.addItem(block("휴지통으로 이동", key: "d", modifiers: .command, symbol: "trash") { [weak self] in
             self?.moveToTrash(urls)
         })
@@ -1698,6 +1712,27 @@ extension FileTableView.Coordinator: NSMenuDelegate {
 
     @objc fileprivate func invokeMenuAction(_ sender: NSMenuItem) {
         (sender.representedObject as? ActionBox)?.action()
+    }
+
+    /// The row icon with a small Finder tag dot composited into the corner,
+    /// or the plain icon when the item has no color tag.
+    static func iconWithTagDot(_ item: FileItem) -> NSImage {
+        guard let color = item.labelColor else { return item.icon }
+        let base = item.icon
+        let size = base.size
+        let out = NSImage(size: size)
+        out.lockFocus()
+        base.draw(in: NSRect(origin: .zero, size: size))
+        let d = max(5, size.width * 0.42)
+        let rect = NSRect(x: size.width - d, y: 0, width: d, height: d)
+        color.setFill()
+        let dot = NSBezierPath(ovalIn: rect)
+        dot.fill()
+        NSColor.windowBackgroundColor.setStroke()
+        dot.lineWidth = max(1, d * 0.14)
+        dot.stroke()
+        out.unlockFocus()
+        return out
     }
 
     // MARK: - Action helpers (mirror FileListView methods)
@@ -1992,6 +2027,45 @@ extension FileTableView.Coordinator: NSMenuDelegate {
         }
         UndoService.shared.register(.create(urls: [url]), label: "새로 만들기")
         parent.nav.reload(thenSelect: [url])
+    }
+
+    /// Finder-style ⌘D: copy each selected item next to itself as "name (2)".
+    private func duplicateItems(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let dir = parent.nav.currentURL
+        let ops = urls.map { FileOperation(src: $0, dst: uniqueDestinationName($0.lastPathComponent, in: dir), isMove: false) }
+        let nav = parent.nav
+        FileOperationService.shared.perform(ops, title: "복사 중…") { done, err in
+            let landed = done.map(\.dst)
+            if !landed.isEmpty {
+                UndoService.shared.register(.create(urls: landed), label: "복제")
+                nav.reload(thenSelect: Set(landed))
+            }
+            if let err { self.alertError("복제 실패", message: err.localizedDescription) }
+        }
+    }
+
+    /// Finder-style "New Folder with Selection": make a folder and move the
+    /// selected items into it.
+    private func newFolderWithSelection(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let dir = parent.nav.currentURL
+        let folder = unique(L("새 폴더"), in: dir)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        } catch {
+            alertError("폴더 만들기 실패", message: error.localizedDescription); return
+        }
+        let ops = urls.map { FileOperation(src: $0, dst: folder.appendingPathComponent($0.lastPathComponent), isMove: true) }
+        let nav = parent.nav
+        FileOperationService.shared.perform(ops, title: "이동 중…") { done, err in
+            let moved = done.map { (from: $0.src, to: $0.dst) }
+            var actions: [UndoAction] = [.create(urls: [folder])]
+            if !moved.isEmpty { actions.append(.move(pairs: moved)) }
+            UndoService.shared.register(.batch(actions), label: "선택 항목으로 새 폴더")
+            nav.reload(thenSelect: [folder])
+            if let err { self.alertError("이동 실패", message: err.localizedDescription) }
+        }
     }
 
     private func showSharingPicker(_ urls: [URL]) {

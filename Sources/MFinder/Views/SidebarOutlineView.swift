@@ -1603,6 +1603,12 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                                                                 blanket: &blanket)
                         if choice == .skip { continue }
                         if choice == .cancel { break }
+                        if choice == .keepBoth {
+                            ops.append(FileOperation(src: src,
+                                                     dst: uniqueChildName(in: dst, base: src.lastPathComponent),
+                                                     isMove: !shouldCopy))
+                            continue
+                        }
                         try? FileManager.default.removeItem(at: plainTarget)
                     }
                     target = plainTarget

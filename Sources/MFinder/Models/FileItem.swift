@@ -14,6 +14,9 @@ struct FileItem: Identifiable, Hashable {
     /// Cloud sync state for File Provider items (OneDrive / Google Drive /
     /// iCloud Drive). `.notCloud` for ordinary local files.
     let cloudState: CloudState
+    /// Finder label/tag color, when the item carries a color tag. Shown as a
+    /// small dot in the views. nil for untagged items (or text-only tags).
+    var labelColor: NSColor? = nil
 
     enum CloudState {
         case notCloud

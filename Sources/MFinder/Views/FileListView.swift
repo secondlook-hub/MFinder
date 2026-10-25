@@ -96,7 +96,7 @@ struct FileListView: View {
         let renaming = nav.renamingURL == item.url
         let cut = clipboard.isCut(item.url)
         return HStack(spacing: 4) {
-            IconView(image: item.icon, size: 16)
+            IconView(item: item, size: 16)
             if renaming {
                 RenameTextField(
                     item: item,
@@ -147,7 +147,7 @@ struct FileListView: View {
         let renaming = nav.renamingURL == item.url
         let cut = clipboard.isCut(item.url)
         return VStack(spacing: 4) {
-            IconView(image: item.icon, size: size)
+            IconView(item: item, size: size)
             if renaming {
                 RenameTextField(
                     item: item,
@@ -199,7 +199,7 @@ struct FileListView: View {
         let renaming = nav.renamingURL == item.url
         let cut = clipboard.isCut(item.url)
         return HStack(spacing: 8) {
-            IconView(image: item.icon, size: 48)
+            IconView(item: item, size: 48)
             VStack(alignment: .leading, spacing: 1) {
                 if renaming {
                     RenameTextField(
@@ -242,7 +242,7 @@ struct FileListView: View {
                     let renaming = nav.renamingURL == item.url
                     let cut = clipboard.isCut(item.url)
                     HStack(alignment: .top, spacing: 10) {
-                        IconView(image: item.icon, size: 32)
+                        IconView(item: item, size: 32)
                         VStack(alignment: .leading, spacing: 2) {
                             if renaming {
                                 RenameTextField(
@@ -369,6 +369,18 @@ struct FileListView: View {
             let ordered = nav.filteredItems.map(\.url).filter(Set(targets).contains)
             promptNormalizeNames(ordered.isEmpty ? targets : ordered, nav: nav)
         }
+        Divider()
+        Button {
+            duplicateItems(targets)
+        } label: {
+            Label(targets.count > 1 ? Lf("복제 (%@개)", "\(targets.count)") : L("복제"), systemImage: "plus.square.on.square")
+        }
+        Button {
+            newFolderWithSelection(targets)
+        } label: {
+            Label(targets.count > 1 ? Lf("선택 항목으로 새 폴더 (%@개)", "\(targets.count)") : L("선택 항목으로 새 폴더"), systemImage: "folder.badge.plus")
+        }
+        Divider()
         Button(role: .destructive) {
             var trashed: [URL] = []
             for url in targets where (try? FileSystemService.shared.moveToTrash(url)) != nil {
@@ -999,6 +1011,41 @@ struct FileListView: View {
         nav.reload()
     }
 
+    /// Finder-style ⌘D: copy each selected item next to itself as "name (2)".
+    private func duplicateItems(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let dir = nav.currentURL
+        let ops = urls.map { FileOperation(src: $0, dst: unique($0.lastPathComponent, in: dir), isMove: false) }
+        FileOperationService.shared.perform(ops, title: "복사 중…") { done, err in
+            let landed = done.map(\.dst)
+            if !landed.isEmpty {
+                UndoService.shared.register(.create(urls: landed), label: "복제")
+                nav.reload(thenSelect: Set(landed))
+            }
+            if let err { showError("복제 실패", message: err.localizedDescription) }
+        }
+    }
+
+    /// Finder-style "New Folder with Selection": make a folder and move the
+    /// selected items into it.
+    private func newFolderWithSelection(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let dir = nav.currentURL
+        let folder = unique(L("새 폴더"), in: dir)
+        guard (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)) != nil else {
+            nav.reload(); return
+        }
+        let ops = urls.map { FileOperation(src: $0, dst: folder.appendingPathComponent($0.lastPathComponent), isMove: true) }
+        FileOperationService.shared.perform(ops, title: "이동 중…") { done, err in
+            let moved = done.map { (from: $0.src, to: $0.dst) }
+            var actions: [UndoAction] = [.create(urls: [folder])]
+            if !moved.isEmpty { actions.append(.move(pairs: moved)) }
+            UndoService.shared.register(.batch(actions), label: "선택 항목으로 새 폴더")
+            nav.reload(thenSelect: [folder])
+            if let err { showError("이동 실패", message: err.localizedDescription) }
+        }
+    }
+
     private func unique(_ name: String, in dir: URL) -> URL {
         let fm = FileManager.default
         var candidate = dir.appendingPathComponent(name)
@@ -1176,14 +1223,40 @@ struct FileListView: View {
 }
 
 struct IconView: View {
-    let image: NSImage
+    let item: FileItem
     let size: CGFloat
+    @State private var thumb: NSImage?
 
     var body: some View {
-        Image(nsImage: image)
+        Image(nsImage: thumb ?? item.icon)
             .resizable()
             .interpolation(.high)
             .aspectRatio(contentMode: .fit)
             .frame(width: size, height: size)
+            .overlay(alignment: .bottomTrailing) {
+                if let c = item.labelColor {
+                    let d = max(6, size * 0.22)
+                    Circle()
+                        .fill(Color(nsColor: c))
+                        .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: max(1, d * 0.12)))
+                        .frame(width: d, height: d)
+                        .offset(x: d * 0.15, y: d * 0.15)
+                }
+            }
+            .onAppear { load() }
+            .onChange(of: item.url) { _ in thumb = nil; load() }
+    }
+
+    private func load() {
+        guard ThumbnailService.wantsThumbnail(item) else { return }
+        if let hit = ThumbnailService.shared.cached(for: item.url, pixelSize: Int((size * (NSScreen.main?.backingScaleFactor ?? 2)).rounded())) {
+            thumb = hit; return
+        }
+        // Don't bother thumbnailing the tiny 16pt list glyph — the type icon
+        // reads better at that size and it keeps big folders cheap.
+        guard size >= 24 else { return }
+        ThumbnailService.shared.thumbnail(for: item.url, pointSize: size) { img in
+            thumb = img
+        }
     }
 }
