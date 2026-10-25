@@ -15,6 +15,7 @@ final class PreferencesService {
     private let kColumnWidths  = "MFinder.detailColumnWidths"
     private let kGroupField    = "MFinder.groupField"
     private let kShowPreview   = "MFinder.showPreviewPane"
+    private let kShowExt       = "MFinder.showExtensions"
     private let kSidebarWidth  = "MFinder.sidebarWidth"
     private let kOpenTabPaths   = "MFinder.openTabPaths"
     private let kActiveTabIndex = "MFinder.activeTabIndex"
@@ -22,6 +23,12 @@ final class PreferencesService {
     var showHidden: Bool {
         get { defaults.bool(forKey: kShowHidden) }
         set { defaults.set(newValue, forKey: kShowHidden) }
+    }
+
+    /// Whether filename extensions are shown. Defaults to true (shown).
+    var showExtensions: Bool {
+        get { defaults.object(forKey: kShowExt) == nil ? true : defaults.bool(forKey: kShowExt) }
+        set { defaults.set(newValue, forKey: kShowExt) }
     }
 
     var viewMode: ViewMode {

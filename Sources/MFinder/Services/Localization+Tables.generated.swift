@@ -5,6 +5,12 @@ import Foundation
 
 extension LocalizationTables {
     static let en: [String: String] = [
+        "모든 확장자 표시": "Show All Extensions",
+        "모든 파일 확장자 표시": "Show all filename extensions",
+        "하위 폴더 없음": "No subfolders",
+        "최근 폴더": "Recent Folders",
+        "최근 폴더 없음": "No recent folders",
+        "목록 지우기": "Clear List",
         "휴지통": "Trash",
         "열 보기": "Columns",
         "갤러리": "Gallery",
@@ -437,6 +443,12 @@ extension LocalizationTables {
     ]
 
     static let ja: [String: String] = [
+        "모든 확장자 표시": "すべての拡張子を表示",
+        "모든 파일 확장자 표시": "すべてのファイル名拡張子を表示",
+        "하위 폴더 없음": "サブフォルダなし",
+        "최근 폴더": "最近使ったフォルダ",
+        "최근 폴더 없음": "最近使ったフォルダなし",
+        "목록 지우기": "リストを消去",
         "휴지통": "ゴミ箱",
         "열 보기": "カラム",
         "갤러리": "ギャラリー",
@@ -869,6 +881,12 @@ extension LocalizationTables {
     ]
 
     static let zhHans: [String: String] = [
+        "모든 확장자 표시": "显示所有扩展名",
+        "모든 파일 확장자 표시": "显示所有文件扩展名",
+        "하위 폴더 없음": "无子文件夹",
+        "최근 폴더": "最近的文件夹",
+        "최근 폴더 없음": "没有最近的文件夹",
+        "목록 지우기": "清除列表",
         "휴지통": "废纸篓",
         "열 보기": "分栏",
         "갤러리": "画廊",
@@ -1301,6 +1319,12 @@ extension LocalizationTables {
     ]
 
     static let zhHant: [String: String] = [
+        "모든 확장자 표시": "顯示所有副檔名",
+        "모든 파일 확장자 표시": "顯示所有檔案副檔名",
+        "하위 폴더 없음": "沒有子檔案夾",
+        "최근 폴더": "最近使用的檔案夾",
+        "최근 폴더 없음": "沒有最近使用的檔案夾",
+        "목록 지우기": "清除列表",
         "휴지통": "垃圾桶",
         "열 보기": "直欄",
         "갤러리": "圖庫",
@@ -1733,6 +1757,12 @@ extension LocalizationTables {
     ]
 
     static let es: [String: String] = [
+        "모든 확장자 표시": "Mostrar todas las extensiones",
+        "모든 파일 확장자 표시": "Mostrar todas las extensiones de archivo",
+        "하위 폴더 없음": "Sin subcarpetas",
+        "최근 폴더": "Carpetas recientes",
+        "최근 폴더 없음": "Sin carpetas recientes",
+        "목록 지우기": "Borrar lista",
         "휴지통": "Papelera",
         "열 보기": "Columnas",
         "갤러리": "Galería",
@@ -2165,6 +2195,12 @@ extension LocalizationTables {
     ]
 
     static let fr: [String: String] = [
+        "모든 확장자 표시": "Afficher toutes les extensions",
+        "모든 파일 확장자 표시": "Afficher toutes les extensions de fichier",
+        "하위 폴더 없음": "Aucun sous-dossier",
+        "최근 폴더": "Dossiers récents",
+        "최근 폴더 없음": "Aucun dossier récent",
+        "목록 지우기": "Effacer la liste",
         "휴지통": "Corbeille",
         "열 보기": "Colonnes",
         "갤러리": "Galerie",
@@ -2597,6 +2633,12 @@ extension LocalizationTables {
     ]
 
     static let de: [String: String] = [
+        "모든 확장자 표시": "Alle Suffixe einblenden",
+        "모든 파일 확장자 표시": "Alle Dateinamensuffixe einblenden",
+        "하위 폴더 없음": "Keine Unterordner",
+        "최근 폴더": "Zuletzt benutzte Ordner",
+        "최근 폴더 없음": "Keine zuletzt benutzten Ordner",
+        "목록 지우기": "Liste löschen",
         "휴지통": "Papierkorb",
         "열 보기": "Spalten",
         "갤러리": "Galerie",
@@ -3029,6 +3071,12 @@ extension LocalizationTables {
     ]
 
     static let it: [String: String] = [
+        "모든 확장자 표시": "Mostra tutte le estensioni",
+        "모든 파일 확장자 표시": "Mostra tutte le estensioni dei file",
+        "하위 폴더 없음": "Nessuna sottocartella",
+        "최근 폴더": "Cartelle recenti",
+        "최근 폴더 없음": "Nessuna cartella recente",
+        "목록 지우기": "Cancella elenco",
         "휴지통": "Cestino",
         "열 보기": "Colonne",
         "갤러리": "Galleria",
@@ -3461,6 +3509,12 @@ extension LocalizationTables {
     ]
 
     static let ptBR: [String: String] = [
+        "모든 확장자 표시": "Mostrar todas as extensões",
+        "모든 파일 확장자 표시": "Mostrar todas as extensões de arquivo",
+        "하위 폴더 없음": "Sem subpastas",
+        "최근 폴더": "Pastas recentes",
+        "최근 폴더 없음": "Nenhuma pasta recente",
+        "목록 지우기": "Limpar lista",
         "휴지통": "Lixeira",
         "열 보기": "Colunas",
         "갤러리": "Galeria",
@@ -3893,6 +3947,12 @@ extension LocalizationTables {
     ]
 
     static let ru: [String: String] = [
+        "모든 확장자 표시": "Показывать все расширения",
+        "모든 파일 확장자 표시": "Показывать все расширения имён файлов",
+        "하위 폴더 없음": "Нет вложенных папок",
+        "최근 폴더": "Недавние папки",
+        "최근 폴더 없음": "Нет недавних папок",
+        "목록 지우기": "Очистить список",
         "휴지통": "Корзина",
         "열 보기": "Столбцы",
         "갤러리": "Галерея",
@@ -4325,6 +4385,12 @@ extension LocalizationTables {
     ]
 
     static let nl: [String: String] = [
+        "모든 확장자 표시": "Alle extensies tonen",
+        "모든 파일 확장자 표시": "Alle bestandsextensies tonen",
+        "하위 폴더 없음": "Geen submappen",
+        "최근 폴더": "Recente mappen",
+        "최근 폴더 없음": "Geen recente mappen",
+        "목록 지우기": "Lijst wissen",
         "휴지통": "Prullenmand",
         "열 보기": "Kolommen",
         "갤러리": "Galerie",
@@ -4757,6 +4823,12 @@ extension LocalizationTables {
     ]
 
     static let pl: [String: String] = [
+        "모든 확장자 표시": "Pokaż wszystkie rozszerzenia",
+        "모든 파일 확장자 표시": "Pokaż wszystkie rozszerzenia plików",
+        "하위 폴더 없음": "Brak podfolderów",
+        "최근 폴더": "Ostatnie foldery",
+        "최근 폴더 없음": "Brak ostatnich folderów",
+        "목록 지우기": "Wyczyść listę",
         "휴지통": "Kosz",
         "열 보기": "Kolumny",
         "갤러리": "Galeria",
@@ -5189,6 +5261,12 @@ extension LocalizationTables {
     ]
 
     static let tr: [String: String] = [
+        "모든 확장자 표시": "Tüm uzantıları göster",
+        "모든 파일 확장자 표시": "Tüm dosya adı uzantılarını göster",
+        "하위 폴더 없음": "Alt klasör yok",
+        "최근 폴더": "Son Klasörler",
+        "최근 폴더 없음": "Son klasör yok",
+        "목록 지우기": "Listeyi temizle",
         "휴지통": "Çöp Tenekesi",
         "열 보기": "Sütunlar",
         "갤러리": "Galeri",
@@ -5621,6 +5699,12 @@ extension LocalizationTables {
     ]
 
     static let vi: [String: String] = [
+        "모든 확장자 표시": "Hiện tất cả phần mở rộng",
+        "모든 파일 확장자 표시": "Hiện tất cả phần mở rộng tệp",
+        "하위 폴더 없음": "Không có thư mục con",
+        "최근 폴더": "Thư mục gần đây",
+        "최근 폴더 없음": "Không có thư mục gần đây",
+        "목록 지우기": "Xóa danh sách",
         "휴지통": "Thùng rác",
         "열 보기": "Cột",
         "갤러리": "Thư viện",
@@ -6053,6 +6137,12 @@ extension LocalizationTables {
     ]
 
     static let idn: [String: String] = [
+        "모든 확장자 표시": "Tampilkan Semua Ekstensi",
+        "모든 파일 확장자 표시": "Tampilkan semua ekstensi berkas",
+        "하위 폴더 없음": "Tidak ada subfolder",
+        "최근 폴더": "Folder Terbaru",
+        "최근 폴더 없음": "Tidak ada folder terbaru",
+        "목록 지우기": "Hapus Daftar",
         "휴지통": "Tempat Sampah",
         "열 보기": "Kolom",
         "갤러리": "Galeri",
@@ -6485,6 +6575,12 @@ extension LocalizationTables {
     ]
 
     static let ar: [String: String] = [
+        "모든 확장자 표시": "إظهار جميع الامتدادات",
+        "모든 파일 확장자 표시": "إظهار جميع امتدادات أسماء الملفات",
+        "하위 폴더 없음": "لا مجلدات فرعية",
+        "최근 폴더": "المجلدات الأخيرة",
+        "최근 폴더 없음": "لا مجلدات أخيرة",
+        "목록 지우기": "مسح القائمة",
         "휴지통": "المهملات",
         "열 보기": "أعمدة",
         "갤러리": "المعرض",
@@ -6917,6 +7013,12 @@ extension LocalizationTables {
     ]
 
     static let hi: [String: String] = [
+        "모든 확장자 표시": "सभी एक्सटेंशन दिखाएँ",
+        "모든 파일 확장자 표시": "सभी फ़ाइल नाम एक्सटेंशन दिखाएँ",
+        "하위 폴더 없음": "कोई सबफ़ोल्डर नहीं",
+        "최근 폴더": "हाल के फ़ोल्डर",
+        "최근 폴더 없음": "कोई हाल का फ़ोल्डर नहीं",
+        "목록 지우기": "सूची साफ़ करें",
         "휴지통": "ट्रैश",
         "열 보기": "कॉलम",
         "갤러리": "गैलरी",

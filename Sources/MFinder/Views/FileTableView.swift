@@ -9,6 +9,7 @@ struct FileTableView: NSViewRepresentable {
     @ObservedObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
     @ObservedObject private var themes = ThemeService.shared
+    @ObservedObject private var uiState = AppUIState.shared
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -162,8 +163,10 @@ struct FileTableView: NSViewRepresentable {
         // Reload when items, search context, grouping, cut highlighting, or
         // styling changed. Assigning coord.items rebuilds the display rows.
         let groupChanged = coord.lastGroupField != nav.groupField
+        let extChanged = coord.lastShowExtensions != uiState.showExtensions
+        if extChanged { coord.lastShowExtensions = uiState.showExtensions }
         if coord.lastDataVersion != nav.dataVersion || searchStateChanged || cutSetChanged
-            || themeChanged || fontChanged || groupChanged {
+            || themeChanged || fontChanged || groupChanged || extChanged {
             coord.lastDataVersion = nav.dataVersion
             coord.lastGroupField = nav.groupField
             coord.items = nav.filteredItems
@@ -306,6 +309,7 @@ extension FileTableView {
         var lastDataVersion: Int = -1
         var lastTheme: Theme? = nil
         var lastFontSize: CGFloat = -1
+        var lastShowExtensions = true
         var lastRenamingURL: URL? = nil
         var searchRoot: URL? = nil
         var searchQuery: String? = nil
@@ -511,6 +515,7 @@ extension FileTableView {
             tf.drawsBackground = true
             tf.backgroundColor = .textBackgroundColor
             tf.focusRingType = .default
+            tf.stringValue = item.name   // edit the full name even when extensions are hidden
             tv.scrollRowToVisible(row)
             tv.editColumn(0, row: row, with: nil, select: true)
             // End the edit if focus leaves the app/window — forcing the table
@@ -1020,7 +1025,7 @@ extension FileTableView.Coordinator: NSTableViewDelegate {
             tf.textColor = theming.theme.text.nsColor
         }
         cell.imageView?.image = Self.iconWithTagDot(item)
-        cell.textField?.stringValue = item.name
+        cell.textField?.stringValue = item.displayName
         // The badge alone doesn't say what it means; spell it out on hover.
         cell.toolTip = item.isNotDownloaded
             ? L("온라인 전용 — 열거나 복사하면 자동으로 다운로드됩니다") : nil

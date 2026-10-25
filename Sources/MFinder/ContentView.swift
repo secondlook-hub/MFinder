@@ -58,6 +58,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .mfinderGoUp)) { _ in
             tabs.active.goUp()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mfinderNavigateTo)) { notif in
+            if let url = notif.object as? URL { tabs.active.navigate(to: url) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mfinderConnectToServer)) { _ in
             ServerConnectDialog.shared.present { mountedURL in
                 tabs.newTab(at: mountedURL)

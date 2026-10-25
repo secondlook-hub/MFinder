@@ -92,10 +92,26 @@ struct AddressBar: View {
                 .onHover { hovering in
                     if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                 }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 1)
+                Menu {
+                    let subs = ((try? FileSystemService.shared.listContents(of: comp.url, showHidden: nav.showHidden)) ?? [])
+                        .filter(\.isDirectory)
+                        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                    if subs.isEmpty {
+                        Text(L("하위 폴더 없음")).disabled(true)
+                    } else {
+                        ForEach(subs) { sub in
+                            Button(sub.displayName) { nav.navigate(to: sub.url) }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .padding(.horizontal, 1)
             }
             Spacer()
         }

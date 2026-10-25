@@ -27,7 +27,15 @@ struct FileItem: Identifiable, Hashable {
         case downloaded
     }
 
-    var displayName: String { name }
+    /// Name as shown in the UI: the full name, or the extension stripped when
+    /// "확장자 표시" is off. Folders and dotfiles (e.g. ".bashrc") keep their
+    /// full name. Renaming always uses `name`, never this.
+    var displayName: String {
+        if AppUIState.extensionsShown || isDirectory { return name }
+        if name.hasPrefix(".") { return name }
+        guard !url.pathExtension.isEmpty else { return name }
+        return url.deletingPathExtension().lastPathComponent
+    }
 
     var isNotDownloaded: Bool { cloudState == .notDownloaded }
 

@@ -6,6 +6,7 @@ struct FileListView: View {
     @EnvironmentObject var nav: NavigationState
     @ObservedObject private var clipboard = ClipboardService.shared
     @ObservedObject private var themes = ThemeService.shared
+    @ObservedObject private var uiState = AppUIState.shared
 
     var body: some View {
         Group {
@@ -109,7 +110,7 @@ struct FileListView: View {
                 )
                 .frame(width: 170, height: themes.fontSize + 6)
             } else {
-                Text(item.name)
+                Text(item.displayName)
                     .font(.system(size: themes.fontSize))
                     .foregroundColor(themes.theme.text.color)
                     .lineLimit(1)
@@ -160,7 +161,7 @@ struct FileListView: View {
                 )
                 .frame(width: max(size + 24, 100), height: 36)
             } else {
-                Text(item.name)
+                Text(item.displayName)
                     .font(.system(size: themes.secondaryFontSize))
                     .foregroundColor(themes.theme.text.color)
                     .lineLimit(2)
@@ -213,7 +214,7 @@ struct FileListView: View {
                     )
                     .frame(height: 20)
                 } else {
-                    Text(item.name).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color).lineLimit(1)
+                    Text(item.displayName).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color).lineLimit(1)
                 }
                 Text(item.typeDescription).font(.system(size: themes.secondaryFontSize)).foregroundColor(themes.theme.secondaryText.color).lineLimit(1)
                 if !item.isDirectory {
@@ -256,7 +257,7 @@ struct FileListView: View {
                                 )
                                 .frame(height: 22)
                             } else {
-                                Text(item.name).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color)
+                                Text(item.displayName).font(.system(size: themes.fontSize, weight: .semibold)).foregroundColor(themes.theme.text.color)
                             }
                             HStack(spacing: 16) {
                                 Text(Lf("수정한 날짜: %@", "\(item.modificationString)"))

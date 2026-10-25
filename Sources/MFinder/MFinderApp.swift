@@ -87,6 +87,9 @@ struct MFinderApp: App {
                 Button(L("미리 보기 패널")) {
                     AppUIState.shared.showPreviewPane.toggle()
                 }.keyboardShortcut("p", modifiers: [.command, .shift])
+                Button(L("모든 확장자 표시")) {
+                    AppUIState.shared.showExtensions.toggle()
+                }
                 Divider()
                 Button(L("글자 크게")) {
                     ThemeService.shared.increaseFontSize()
@@ -108,6 +111,8 @@ struct MFinderApp: App {
                 Button(L("위로")) {
                     NotificationCenter.default.post(name: .mfinderGoUp, object: nil)
                 }.keyboardShortcut(.upArrow, modifiers: [.command])
+                Divider()
+                Menu(L("최근 폴더")) { RecentFoldersMenu() }
                 Divider()
                 Button(L("서버에 연결…")) {
                     NotificationCenter.default.post(name: .mfinderConnectToServer, object: nil)
@@ -144,6 +149,7 @@ extension Notification.Name {
     static let mfinderTreeCut           = Notification.Name("mfinder.treeCut")
     static let mfinderTreePaste         = Notification.Name("mfinder.treePaste")
     static let mfinderConnectToServer   = Notification.Name("mfinder.connectToServer")
+    static let mfinderNavigateTo        = Notification.Name("mfinder.navigateTo")
     static let mfinderGetInfo           = Notification.Name("mfinder.getInfo")
 }
 

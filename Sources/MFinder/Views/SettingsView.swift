@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @ObservedObject private var themes = ThemeService.shared
     @ObservedObject private var loc = LocalizationService.shared
+    @ObservedObject private var uiState = AppUIState.shared
     @State private var importResult: String?
 
     /// Non-nil while the theme editor sheet is up. Carries the draft the
@@ -68,6 +69,8 @@ struct SettingsView: View {
                 Text(L("파일 목록·자세히 보기·사이드바 트리에 적용됩니다. (⌘= 크게 / ⌘- 작게 / ⌘0 기본)"))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                Toggle(L("모든 파일 확장자 표시"), isOn: $uiState.showExtensions)
+                    .padding(.top, 4)
             }
 
             Divider()

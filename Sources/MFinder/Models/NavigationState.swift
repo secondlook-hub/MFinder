@@ -285,6 +285,7 @@ final class NavigationState: ObservableObject {
         currentURL = target
         selectedItems.removeAll()
         pendingSelection = nil    // navigating away invalidates any in-flight selection
+        RecentsService.shared.record(target)
         reload()
         // Reveal the destination in the sidebar tree synchronously — symlink /
         // alias jumps land outside the previously-expanded subtree, so we need
