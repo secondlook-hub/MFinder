@@ -8,7 +8,7 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 ## Features
 
 - **Tabs** — Multi-tab browsing with drag-free reordering shortcuts (Cmd+T / Cmd+W, Cmd+Shift+]/[ to switch). The open tabs are restored on the next launch, at the same folders; windows opened via 새 창 start fresh at Home
-- **View Modes** — Details (native NSTableView), List, Small / Medium / Large / Extra-Large Icons, Tiles, Content
+- **View Modes** — Details (native NSTableView), List, Small / Medium / Large / Extra-Large Icons, Tiles, Content, **Columns** (Finder-style Miller columns with a leaf Quick Look preview), and **Gallery** (large Quick Look preview + thumbnail filmstrip)
 - **NSOutlineView Sidebar** — 즐겨찾기 (favorites with pinning), 내 PC (volumes), 클라우드 (cloud accounts), 네트워크 sections under a single outline view; inline folder rename via AppKit's `editColumn` field editor
 - **Multi-Select in Tree** — Cmd-click / Shift-click multiple folders in the sidebar to copy, cut, trash, pin, alias, or reveal them all at once. Single-target actions (rename, paste-into, eject) stay scoped to the right-clicked row
 - **Live Volume List** — Mounted DMGs, external drives, and network shares appear in the 내 PC section the moment they mount, each with an inline ⏏ eject button; right-click → 꺼내기 also works
@@ -44,7 +44,8 @@ A native macOS file manager with a Windows-Explorer-style layout, built with Swi
 - **Cloud Storage** — 클라우드 sidebar section listing every File Provider root under `~/Library/CloudStorage` (OneDrive / Google Drive / Dropbox / Box, one row per account) plus iCloud Drive. No API keys or OAuth: the provider's own macOS client does the syncing and MFinder browses what it publishes, so a provider appears the moment its client is installed
 - **Online-Only Badges** — Files that live in the cloud but aren't downloaded yet get a blue download badge and a dimmed icon in every view mode; hovering explains that opening or copying materializes them
 - **Persistent Sidebar Width** — Drag the divider between the tree and the file list; the width sticks across tab switches, app re-activation, and relaunches
-- **Async Copy/Move with Progress** — Paste and drag-drop run in the background with an Explorer-style progress panel (current item, N/M counter, byte-accurate bar, cancel); the UI never freezes on multi-GB copies
+- **Async Copy/Move with Progress** — Paste and drag-drop run in the background with an Explorer-style progress panel (current item, N/M counter, byte-accurate bar, transfer speed + estimated time remaining, cancel); the UI never freezes on multi-GB copies
+- **Trash Quick Access** — A 휴지통 entry in the 즐겨찾기 section opens `~/.Trash`; empty it with ⌘⇧⌫ (removable like any other built-in favorite)
 - **Undo / Redo (⌘Z / ⇧⌘Z)** — Reverts paste, drag move/copy, rename (single + batch), 새로 만들기, 바로 가기 만들기, and 휴지통 이동 (restores from the Trash), up to 50 steps
 - **Group By** — 그룹화 기준 in the details view: 이름 / 수정한 날짜(오늘·어제·이번 주…) / 유형 / 크기 buckets / 만든 날짜 / 확장명, with item counts per group header
 - **Preview Pane (⇧⌘P)** — Docked Quick Look preview + key attributes on the right, updating with the selection

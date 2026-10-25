@@ -18,6 +18,8 @@ struct FileListView: View {
             case .extraLargeIcons:  iconsView(size: 96)
             case .tiles:            tilesView
             case .content:          contentView
+            case .gallery:          GalleryView()
+            case .columns:          ColumnsBrowserView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

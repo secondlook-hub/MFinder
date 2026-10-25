@@ -5,6 +5,14 @@ import Foundation
 
 extension LocalizationTables {
     static let en: [String: String] = [
+        "휴지통": "Trash",
+        "열 보기": "Columns",
+        "갤러리": "Gallery",
+        "%@/초 · 약 %@ 남음": "%@/s · about %@ left",
+        "거의 완료": "Almost done",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d h",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nYou can install it manually from the download page.",
         "\"%@\" 검색 결과 %@개": "%@ results for “%@”",
         "\"%@\" 검색 중… (%@개 발견)": "Searching “%@”… (%@ found)",
@@ -429,6 +437,14 @@ extension LocalizationTables {
     ]
 
     static let ja: [String: String] = [
+        "휴지통": "ゴミ箱",
+        "열 보기": "カラム",
+        "갤러리": "ギャラリー",
+        "%@/초 · 약 %@ 남음": "%@/秒 · 残り約 %@",
+        "거의 완료": "まもなく完了",
+        "%d초": "%d秒",
+        "%d분": "%d分",
+        "%d시간": "%d時間",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nダウンロードページから手動でインストールできます。",
         "\"%@\" 검색 결과 %@개": "「%@」の検索結果 %@ 件",
         "\"%@\" 검색 중… (%@개 발견)": "「%@」を検索中… (%@ 件見つかりました)",
@@ -853,6 +869,14 @@ extension LocalizationTables {
     ]
 
     static let zhHans: [String: String] = [
+        "휴지통": "废纸篓",
+        "열 보기": "分栏",
+        "갤러리": "画廊",
+        "%@/초 · 약 %@ 남음": "%@/秒 · 约剩 %@",
+        "거의 완료": "即将完成",
+        "%d초": "%d秒",
+        "%d분": "%d分钟",
+        "%d시간": "%d小时",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\n您可以从下载页面手动安装。",
         "\"%@\" 검색 결과 %@개": "“%@”的搜索结果 %@ 项",
         "\"%@\" 검색 중… (%@개 발견)": "正在搜索“%@”…（找到 %@ 项）",
@@ -1277,6 +1301,14 @@ extension LocalizationTables {
     ]
 
     static let zhHant: [String: String] = [
+        "휴지통": "垃圾桶",
+        "열 보기": "直欄",
+        "갤러리": "圖庫",
+        "%@/초 · 약 %@ 남음": "%@/秒 · 約剩 %@",
+        "거의 완료": "即將完成",
+        "%d초": "%d秒",
+        "%d분": "%d分鐘",
+        "%d시간": "%d小時",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\n您可以從下載頁面手動安裝。",
         "\"%@\" 검색 결과 %@개": "「%@」的搜尋結果 %@ 個",
         "\"%@\" 검색 중… (%@개 발견)": "正在搜尋「%@」…（已找到 %@ 個）",
@@ -1701,6 +1733,14 @@ extension LocalizationTables {
     ]
 
     static let es: [String: String] = [
+        "휴지통": "Papelera",
+        "열 보기": "Columnas",
+        "갤러리": "Galería",
+        "%@/초 · 약 %@ 남음": "%@/s · aprox. %@ restante",
+        "거의 완료": "Casi listo",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d h",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nPuede instalarlo manualmente desde la página de descarga.",
         "\"%@\" 검색 결과 %@개": "%@ resultados de “%@”",
         "\"%@\" 검색 중… (%@개 발견)": "Buscando “%@”… (%@ encontrados)",
@@ -2125,6 +2165,14 @@ extension LocalizationTables {
     ]
 
     static let fr: [String: String] = [
+        "휴지통": "Corbeille",
+        "열 보기": "Colonnes",
+        "갤러리": "Galerie",
+        "%@/초 · 약 %@ 남음": "%@/s · env. %@ restant",
+        "거의 완료": "Presque terminé",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d h",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nVous pouvez l'installer manuellement depuis la page de téléchargement.",
         "\"%@\" 검색 결과 %@개": "%@ résultats pour « %@ »",
         "\"%@\" 검색 중… (%@개 발견)": "Recherche de « %@ »… (%@ trouvés)",
@@ -2549,6 +2597,14 @@ extension LocalizationTables {
     ]
 
     static let de: [String: String] = [
+        "휴지통": "Papierkorb",
+        "열 보기": "Spalten",
+        "갤러리": "Galerie",
+        "%@/초 · 약 %@ 남음": "%@/s · noch ca. %@",
+        "거의 완료": "Fast fertig",
+        "%d초": "%d Sek.",
+        "%d분": "%d Min.",
+        "%d시간": "%d Std.",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nSie können es manuell von der Download-Seite installieren.",
         "\"%@\" 검색 결과 %@개": "%@ Treffer für „%@“",
         "\"%@\" 검색 중… (%@개 발견)": "„%@“ wird gesucht … (%@ gefunden)",
@@ -2973,6 +3029,14 @@ extension LocalizationTables {
     ]
 
     static let it: [String: String] = [
+        "휴지통": "Cestino",
+        "열 보기": "Colonne",
+        "갤러리": "Galleria",
+        "%@/초 · 약 %@ 남음": "%@/s · circa %@ rimanenti",
+        "거의 완료": "Quasi finito",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d h",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nPuoi installarlo manualmente dalla pagina di download.",
         "\"%@\" 검색 결과 %@개": "%@ risultati per «%@»",
         "\"%@\" 검색 중… (%@개 발견)": "Ricerca di «%@» in corso… (%@ trovati)",
@@ -3397,6 +3461,14 @@ extension LocalizationTables {
     ]
 
     static let ptBR: [String: String] = [
+        "휴지통": "Lixeira",
+        "열 보기": "Colunas",
+        "갤러리": "Galeria",
+        "%@/초 · 약 %@ 남음": "%@/s · cerca de %@ restante",
+        "거의 완료": "Quase pronto",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d h",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nVocê pode instalá-lo manualmente a partir da página de download.",
         "\"%@\" 검색 결과 %@개": "%@ resultados para “%@”",
         "\"%@\" 검색 중… (%@개 발견)": "Buscando “%@”… (%@ encontrados)",
@@ -3821,6 +3893,14 @@ extension LocalizationTables {
     ]
 
     static let ru: [String: String] = [
+        "휴지통": "Корзина",
+        "열 보기": "Столбцы",
+        "갤러리": "Галерея",
+        "%@/초 · 약 %@ 남음": "%@/с · осталось ~%@",
+        "거의 완료": "Почти готово",
+        "%d초": "%d с",
+        "%d분": "%d мин",
+        "%d시간": "%d ч",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nВы можете установить его вручную со страницы загрузки.",
         "\"%@\" 검색 결과 %@개": "Результаты поиска «%@»: %@",
         "\"%@\" 검색 중… (%@개 발견)": "Поиск «%@»… (найдено: %@)",
@@ -4245,6 +4325,14 @@ extension LocalizationTables {
     ]
 
     static let nl: [String: String] = [
+        "휴지통": "Prullenmand",
+        "열 보기": "Kolommen",
+        "갤러리": "Galerie",
+        "%@/초 · 약 %@ 남음": "%@/s · nog ca. %@",
+        "거의 완료": "Bijna klaar",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d u",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nU kunt het handmatig installeren vanaf de downloadpagina.",
         "\"%@\" 검색 결과 %@개": "%@ resultaten voor “%@”",
         "\"%@\" 검색 중… (%@개 발견)": "“%@” zoeken… (%@ gevonden)",
@@ -4669,6 +4757,14 @@ extension LocalizationTables {
     ]
 
     static let pl: [String: String] = [
+        "휴지통": "Kosz",
+        "열 보기": "Kolumny",
+        "갤러리": "Galeria",
+        "%@/초 · 약 %@ 남음": "%@/s · pozostało ok. %@",
+        "거의 완료": "Prawie gotowe",
+        "%d초": "%d s",
+        "%d분": "%d min",
+        "%d시간": "%d godz.",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nMożesz zainstalować ją ręcznie ze strony pobierania.",
         "\"%@\" 검색 결과 %@개": "Wyniki dla „%@”: %@",
         "\"%@\" 검색 중… (%@개 발견)": "Wyszukiwanie „%@”… (znaleziono: %@)",
@@ -5093,6 +5189,14 @@ extension LocalizationTables {
     ]
 
     static let tr: [String: String] = [
+        "휴지통": "Çöp Tenekesi",
+        "열 보기": "Sütunlar",
+        "갤러리": "Galeri",
+        "%@/초 · 약 %@ 남음": "%@/sn · yaklaşık %@ kaldı",
+        "거의 완료": "Neredeyse bitti",
+        "%d초": "%d sn",
+        "%d분": "%d dk",
+        "%d시간": "%d sa",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nİndirme sayfasından elle yükleyebilirsiniz.",
         "\"%@\" 검색 결과 %@개": "“%@” için %@ sonuç",
         "\"%@\" 검색 중… (%@개 발견)": "“%@” aranıyor… (%@ bulundu)",
@@ -5517,6 +5621,14 @@ extension LocalizationTables {
     ]
 
     static let vi: [String: String] = [
+        "휴지통": "Thùng rác",
+        "열 보기": "Cột",
+        "갤러리": "Thư viện",
+        "%@/초 · 약 %@ 남음": "%@/giây · còn khoảng %@",
+        "거의 완료": "Sắp xong",
+        "%d초": "%d giây",
+        "%d분": "%d phút",
+        "%d시간": "%d giờ",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nBạn có thể cài đặt thủ công từ trang tải xuống.",
         "\"%@\" 검색 결과 %@개": "Kết quả cho \"%@\": %@",
         "\"%@\" 검색 중… (%@개 발견)": "Đang tìm \"%@\"… (tìm thấy %@)",
@@ -5941,6 +6053,14 @@ extension LocalizationTables {
     ]
 
     static let idn: [String: String] = [
+        "휴지통": "Tempat Sampah",
+        "열 보기": "Kolom",
+        "갤러리": "Galeri",
+        "%@/초 · 약 %@ 남음": "%@/dtk · sekitar %@ lagi",
+        "거의 완료": "Hampir selesai",
+        "%d초": "%d dtk",
+        "%d분": "%d mnt",
+        "%d시간": "%d jam",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nAnda dapat menginstalnya secara manual dari halaman unduhan.",
         "\"%@\" 검색 결과 %@개": "%@ hasil untuk “%@”",
         "\"%@\" 검색 중… (%@개 발견)": "Mencari “%@”… (%@ ditemukan)",
@@ -6365,6 +6485,14 @@ extension LocalizationTables {
     ]
 
     static let ar: [String: String] = [
+        "휴지통": "المهملات",
+        "열 보기": "أعمدة",
+        "갤러리": "المعرض",
+        "%@/초 · 약 %@ 남음": "%@/ث · يتبقى نحو %@",
+        "거의 완료": "على وشك الانتهاء",
+        "%d초": "%d ثانية",
+        "%d분": "%d دقيقة",
+        "%d시간": "%d ساعة",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nيمكنك تثبيته يدويًا من صفحة التنزيل.",
         "\"%@\" 검색 결과 %@개": "نتائج البحث عن ”%@“: %@",
         "\"%@\" 검색 중… (%@개 발견)": "جارٍ البحث عن ”%@“… (تم العثور على %@)",
@@ -6789,6 +6917,14 @@ extension LocalizationTables {
     ]
 
     static let hi: [String: String] = [
+        "휴지통": "ट्रैश",
+        "열 보기": "कॉलम",
+        "갤러리": "गैलरी",
+        "%@/초 · 약 %@ 남음": "%@/से · लगभग %@ शेष",
+        "거의 완료": "लगभग पूरा",
+        "%d초": "%d सेकंड",
+        "%d분": "%d मिनट",
+        "%d시간": "%d घंटे",
         "\n\n다운로드 페이지에서 수동으로 설치할 수 있습니다.": "\n\nआप इसे डाउनलोड पेज से मैन्युअल रूप से इंस्टॉल कर सकते हैं।",
         "\"%@\" 검색 결과 %@개": "“%@” के लिए %@ परिणाम",
         "\"%@\" 검색 중… (%@개 발견)": "“%@” खोजा जा रहा है… (%@ मिले)",

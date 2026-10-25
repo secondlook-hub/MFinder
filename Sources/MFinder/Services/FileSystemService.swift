@@ -347,7 +347,8 @@ final class FileSystemService {
             QuickAccessItem(name: L("문서"),         url: home.appendingPathComponent("Documents"),   systemSymbol: "doc.text",               isPinned: false),
             QuickAccessItem(name: L("사진"),         url: home.appendingPathComponent("Pictures"),    systemSymbol: "photo",                  isPinned: false),
             QuickAccessItem(name: L("음악"),         url: home.appendingPathComponent("Music"),       systemSymbol: "music.note",             isPinned: false),
-            QuickAccessItem(name: L("동영상"),       url: home.appendingPathComponent("Movies"),      systemSymbol: "film",                   isPinned: false)
+            QuickAccessItem(name: L("동영상"),       url: home.appendingPathComponent("Movies"),      systemSymbol: "film",                   isPinned: false),
+            QuickAccessItem(name: L("휴지통"),       url: home.appendingPathComponent(".Trash"),      systemSymbol: "trash",                  isPinned: false)
         ]
         // Built-ins the user removed (Explorer-style) are filtered out; the
         // 즐겨찾기 section's right-click menu restores them.

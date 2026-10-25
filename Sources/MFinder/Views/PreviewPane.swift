@@ -17,7 +17,7 @@ struct PreviewPane: View {
     var body: some View {
         VStack(spacing: 0) {
             if let item = selectedItem {
-                QuickLookPreviewRepresentable(url: item.url)
+                QuickLookPreview(url: item.url)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
                 VStack(alignment: .leading, spacing: 3) {
@@ -63,7 +63,8 @@ struct PreviewPane: View {
 
 /// QLPreviewView wrapper. `close()` on teardown releases the Quick Look
 /// resources (per Apple docs the view leaks its preview otherwise).
-private struct QuickLookPreviewRepresentable: NSViewRepresentable {
+/// Shared by PreviewPane, the gallery view, and the column view's leaf preview.
+struct QuickLookPreview: NSViewRepresentable {
     let url: URL
 
     func makeNSView(context: Context) -> QLPreviewView {

@@ -267,15 +267,7 @@ struct CommandBar: View {
             .padding(.horizontal, 2)
     }
 
-    private var viewModeSymbol: String {
-        switch nav.viewMode {
-        case .details: return "list.dash"
-        case .list:    return "list.bullet"
-        case .smallIcons, .mediumIcons, .largeIcons, .extraLargeIcons: return "square.grid.2x2"
-        case .tiles:   return "rectangle.grid.2x2"
-        case .content: return "doc.text.below.ecg"
-        }
-    }
+    private var viewModeSymbol: String { nav.viewMode.symbol }
 
     private func iconButton(symbol: String, help: String, disabled: Bool = false,
                             action: @escaping () -> Void) -> some View {

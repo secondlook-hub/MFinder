@@ -52,6 +52,7 @@ final class FileOperationService {
             if !finished { panel.show() }
         }
 
+        let started = Date()
         DispatchQueue.global(qos: .userInitiated).async {
             let totalBytes = ops.reduce(Int64(0)) { $0 + Self.sizeOnDisk($1.src, cancel: cancel) }
             var copiedBytes: Int64 = 0
@@ -67,7 +68,10 @@ final class FileOperationService {
                 do {
                     try Self.execute(op, cancel: cancel, totalBytes: totalBytes,
                                      copiedBytes: &copiedBytes) { fraction in
-                        DispatchQueue.main.async { panel.setFraction(fraction) }
+                        DispatchQueue.main.async {
+                            panel.setFraction(fraction)
+                            panel.setStats(fraction: fraction, totalBytes: totalBytes, start: started)
+                        }
                     }
                     done.append(op)
                 } catch is CancelledError {
@@ -234,6 +238,7 @@ private final class FileProgressPanel: NSObject {
     private let panel: NSPanel
     private let itemLabel = NSTextField(labelWithString: "")
     private let countLabel = NSTextField(labelWithString: "")
+    private let detailLabel = NSTextField(labelWithString: "")
     private let bar = NSProgressIndicator()
     private let onCancel: () -> Void
 
@@ -255,6 +260,8 @@ private final class FileProgressPanel: NSObject {
         itemLabel.lineBreakMode = .byTruncatingMiddle
         countLabel.font = .systemFont(ofSize: 11)
         countLabel.textColor = .secondaryLabelColor
+        detailLabel.font = .systemFont(ofSize: 11)
+        detailLabel.textColor = .secondaryLabelColor
 
         bar.isIndeterminate = false
         bar.minValue = 0
@@ -269,7 +276,7 @@ private final class FileProgressPanel: NSObject {
         infoRow.orientation = .horizontal
         infoRow.distribution = .fill
 
-        let stack = NSStackView(views: [titleLabel, bar, infoRow, cancelButton])
+        let stack = NSStackView(views: [titleLabel, bar, infoRow, detailLabel, cancelButton])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -297,6 +304,30 @@ private final class FileProgressPanel: NSObject {
 
     func setFraction(_ fraction: Double) {
         bar.doubleValue = min(max(fraction, 0), 1)
+    }
+
+    private static let sizeFmt: ByteCountFormatter = {
+        let f = ByteCountFormatter(); f.countStyle = .file; return f
+    }()
+
+    /// Show transfer speed + rough ETA, Explorer-style.
+    func setStats(fraction: Double, totalBytes: Int64, start: Date) {
+        guard totalBytes > 0 else { detailLabel.stringValue = ""; return }
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed > 0.5 else { return }
+        let done = Double(totalBytes) * min(max(fraction, 0), 1)
+        let speed = done / elapsed                       // bytes/sec
+        guard speed > 1 else { return }
+        let remain = max(0, Double(totalBytes) - done) / speed
+        let speedStr = Self.sizeFmt.string(fromByteCount: Int64(speed))
+        detailLabel.stringValue = Lf("%@/초 · 약 %@ 남음", speedStr, Self.etaString(remain))
+    }
+
+    private static func etaString(_ seconds: Double) -> String {
+        if seconds < 1 { return L("거의 완료") }
+        if seconds < 60 { return Lf("%d초", Int(seconds.rounded())) }
+        if seconds < 3600 { return Lf("%d분", Int((seconds / 60).rounded())) }
+        return Lf("%d시간", Int((seconds / 3600).rounded()))
     }
 
     func close() {

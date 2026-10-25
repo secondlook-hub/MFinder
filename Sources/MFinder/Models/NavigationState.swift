@@ -12,6 +12,8 @@ enum ViewMode: String, CaseIterable, Identifiable {
     case details         = "자세히"
     case tiles           = "나란히 보기"
     case content         = "내용"
+    case columns         = "열 보기"
+    case gallery         = "갤러리"
 
     var id: String { rawValue }
 
@@ -25,6 +27,8 @@ enum ViewMode: String, CaseIterable, Identifiable {
         case .details:         return 16
         case .tiles:           return 48
         case .content:         return 32
+        case .columns:         return 16
+        case .gallery:         return 96
         }
     }
 
@@ -36,6 +40,8 @@ enum ViewMode: String, CaseIterable, Identifiable {
         case .details:    return "list.dash"
         case .tiles:      return "rectangle.grid.2x2"
         case .content:    return "doc.text.below.ecg"
+        case .columns:    return "rectangle.split.3x1"
+        case .gallery:    return "photo.on.rectangle"
         }
     }
 }
