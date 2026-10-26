@@ -98,14 +98,24 @@ final class FileOperationService {
                                             progress: (Double) -> Void) throws {
         let fm = FileManager.default
         if op.isMove {
-            // Fast path: same-volume rename. Cross-volume (or any failure that
-            // isn't "destination exists") falls back to copy + delete source.
-            do {
-                try fm.moveItem(at: op.src, to: op.dst)
-                copiedBytes += sizeOnDisk(op.src, cancel: nil, fallbackDst: op.dst)
-                if totalBytes > 0 { progress(Double(copiedBytes) / Double(totalBytes)) }
-                return
-            } catch {
+            // A same-volume rename of a dataless placeholder would relink the
+            // empty inode without ever fetching its bytes, so route those
+            // through copyRecursively (which materializes) + delete instead.
+            if !isDataless(op.src) {
+                // Fast path: same-volume rename. Cross-volume (or any failure
+                // that isn't "destination exists") falls back to copy + delete.
+                do {
+                    try fm.moveItem(at: op.src, to: op.dst)
+                    copiedBytes += sizeOnDisk(op.src, cancel: nil, fallbackDst: op.dst)
+                    if totalBytes > 0 { progress(Double(copiedBytes) / Double(totalBytes)) }
+                    return
+                } catch {
+                    try copyRecursively(op.src, to: op.dst, cancel: cancel,
+                                        totalBytes: totalBytes, copiedBytes: &copiedBytes,
+                                        progress: progress)
+                    try? fm.removeItem(at: op.src)
+                }
+            } else {
                 try copyRecursively(op.src, to: op.dst, cancel: cancel,
                                     totalBytes: totalBytes, copiedBytes: &copiedBytes,
                                     progress: progress)
@@ -148,9 +158,65 @@ final class FileOperationService {
 
     /// Chunked file copy so the progress bar moves within a single large file
     /// and cancellation takes effect mid-file (partial output is deleted).
+    ///
+    /// A file copied from a Windows session over a remote-desktop client
+    /// (Microsoft "Windows App"/RDC, Jump Desktop, …) lands on the pasteboard
+    /// as a DATALESS placeholder inside the client's container tmp: the staged
+    /// file reports the right size but has **zero allocated blocks**, and a raw
+    /// read returns all-zeros — which is exactly the "copied file is corrupted"
+    /// report. The real bytes live in the remote session and the File Provider
+    /// only materializes them when the file is read through `NSFileCoordinator`.
+    /// So for a dataless source we run the copy inside a `.forUploading`
+    /// coordinated read, which forces materialization and hands us a readable
+    /// (fully-downloaded) URL; normal local files skip all of that.
     private nonisolated static func streamCopyFile(_ src: URL, to dst: URL, cancel: CancelFlag,
                                                    totalBytes: Int64, copiedBytes: inout Int64,
                                                    progress: (Double) -> Void) throws {
+        let base = copiedBytes
+        if isDataless(src) {
+            var coordErr: NSError?
+            var thrown: Error?
+            var localCopied: Int64 = 0
+            NSFileCoordinator().coordinate(readingItemAt: src, options: [.forUploading],
+                                           error: &coordErr) { readURL in
+                // If the provider still hands back a dataless placeholder (the
+                // remote session is gone, or the file is no longer available on
+                // the far side), copying it would silently produce an all-zeros
+                // file. Fail loudly instead of writing a corrupt copy.
+                if isDataless(readURL) {
+                    thrown = NSError(domain: "MFinder.FileOperation", code: 10, userInfo: [
+                        NSLocalizedDescriptionKey: "원격 파일의 내용을 가져오지 못했습니다. 원격 데스크톱 연결이 끊겼거나 파일을 더 이상 사용할 수 없습니다. 원격 세션에서 파일을 다시 복사한 뒤 붙여넣어 보세요.",
+                        NSFilePathErrorKey: src.path
+                    ])
+                    return
+                }
+                do {
+                    localCopied = try rawStreamCopy(readURL, to: dst, cancel: cancel,
+                                                    totalBytes: totalBytes, copiedBase: base,
+                                                    progress: progress)
+                } catch { thrown = error }
+            }
+            if let thrown { throw thrown }
+            if let coordErr { throw coordErr }
+            copiedBytes = base + localCopied
+            // Keep the original's timestamps/permissions, not the temp copy's.
+            copyAttributes(from: src, to: dst)
+            return
+        }
+
+        let localCopied = try rawStreamCopy(src, to: dst, cancel: cancel,
+                                            totalBytes: totalBytes, copiedBase: base,
+                                            progress: progress)
+        copiedBytes = base + localCopied
+        copyAttributes(from: src, to: dst)
+    }
+
+    /// The raw 4MB-chunk stream copy. Returns the number of bytes written so
+    /// the caller can advance its running total; progress is reported against
+    /// `copiedBase + bytesSoFar` so a single file moves the shared bar smoothly.
+    private nonisolated static func rawStreamCopy(_ src: URL, to dst: URL, cancel: CancelFlag,
+                                                  totalBytes: Int64, copiedBase: Int64,
+                                                  progress: (Double) -> Void) throws -> Int64 {
         let fm = FileManager.default
         guard let input = InputStream(url: src) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: src.path])
@@ -164,6 +230,7 @@ final class FileOperationService {
 
         let bufferSize = 4 << 20  // 4 MB
         var buffer = [UInt8](repeating: 0, count: bufferSize)
+        var localCopied: Int64 = 0
         while input.hasBytesAvailable {
             if cancel.isCancelled {
                 output.close()
@@ -190,10 +257,19 @@ final class FileOperationService {
                 }
                 written += n
             }
-            copiedBytes += Int64(read)
-            if totalBytes > 0 { progress(Double(copiedBytes) / Double(totalBytes)) }
+            localCopied += Int64(read)
+            if totalBytes > 0 { progress(Double(copiedBase + localCopied) / Double(totalBytes)) }
         }
-        copyAttributes(from: src, to: dst)
+        return localCopied
+    }
+
+    /// A dataless File-Provider placeholder: non-empty logical size but zero
+    /// blocks allocated on disk (the bytes still live in the provider). Reading
+    /// it raw yields zeros, so these must be materialized before copying.
+    private nonisolated static func isDataless(_ url: URL) -> Bool {
+        var st = stat()
+        guard stat(url.path, &st) == 0 else { return false }
+        return st.st_size > 0 && st.st_blocks == 0
     }
 
     private nonisolated static func copyAttributes(from src: URL, to dst: URL) {

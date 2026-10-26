@@ -79,8 +79,10 @@ struct FileTableView: NSViewRepresentable {
 
         // Drag &amp; drop wiring.
         // Source: rows can be dragged to other apps or back into this table.
-        // Destination: accept file URLs from anywhere (Finder, this app, other apps).
-        tableView.registerForDraggedTypes([.fileURL])
+        // Destination: accept file URLs from anywhere (Finder, this app, other
+        // apps) plus file PROMISES (Outlook/Mail attachments, remote-desktop
+        // files, …) which don't carry a real file URL until resolved.
+        tableView.registerForDraggedTypes([.fileURL] + DragImport.draggedTypes)
         tableView.setDraggingSourceOperationMask([.copy, .move, .link], forLocal: true)
         tableView.setDraggingSourceOperationMask([.copy], forLocal: false)
 
@@ -742,9 +744,6 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
     func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo,
                    row: Int, dropOperation op: NSTableView.DropOperation) -> Bool {
         let pb = info.draggingPasteboard
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
-              !urls.isEmpty else { return false }
 
         let dst: URL
         if op == .on, let rowItem = item(at: row), rowItem.isDirectory {
@@ -753,78 +752,9 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
             dst = parent.nav.currentURL
         }
 
-        // Source operation mask + held modifier flags determine move vs copy.
-        // macOS convention: holding Option forces .copy; holding Cmd forces .move.
-        let mods = NSEvent.modifierFlags
-        let mask = info.draggingSourceOperationMask
-        let shouldMove: Bool = {
-            if mods.contains(.option) { return false }
-            if mods.contains(.command) { return true }
-            // Default: same-volume = move, cross-volume = copy. Cheap approximation:
-            // if source dirs live under the destination's volume, prefer move.
-            if mask.contains(.move) && !mask.contains(.copy) { return true }
-            // Within-app dragging defaults to move; from Finder defaults to copy.
-            let isInternal = (info.draggingSource as? NSTableView) === tableView
-            return isInternal
-        }()
-
-        // Count overwrite conflicts up front so each dialog can offer a
-        // blanket answer for the rest (same UX as clipboard paste).
-        var conflictsLeft = urls.filter { src in
-            guard src.standardizedFileURL != dst.standardizedFileURL else { return false }
-            let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
-            return plainTarget.standardizedFileURL != src.standardizedFileURL
-                && FileManager.default.fileExists(atPath: plainTarget.path)
-        }.count
-        var blanket: FileConflictChoice?
-
-        var ops: [FileOperation] = []
-        for src in urls {
-            // Skip self-drop or into own parent.
-            if src.standardizedFileURL == dst.standardizedFileURL { continue }
-            let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
-            let sameLocation = plainTarget.standardizedFileURL == src.standardizedFileURL
-            let target: URL
-            if sameLocation {
-                // Dropped back into its own folder: a move is a no-op; a copy
-                // duplicates rather than overwriting the source onto itself.
-                if shouldMove { continue }
-                target = uniqueDestinationName(src.lastPathComponent, in: dst)
-            } else {
-                // A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
-                if FileManager.default.fileExists(atPath: plainTarget.path) {
-                    conflictsLeft -= 1
-                    let choice = blanket ?? askFileConflict(name: src.lastPathComponent,
-                                                            remainingConflicts: conflictsLeft,
-                                                            blanket: &blanket)
-                    if choice == .skip { continue }
-                    if choice == .cancel { break }
-                    if choice == .keepBoth {
-                        ops.append(FileOperation(src: src,
-                                                 dst: uniqueDestinationName(src.lastPathComponent, in: dst),
-                                                 isMove: shouldMove))
-                        continue
-                    }
-                    try? FileManager.default.removeItem(at: plainTarget)
-                }
-                target = plainTarget
-            }
-            ops.append(FileOperation(src: src, dst: target, isMove: shouldMove))
-        }
-        guard !ops.isEmpty else { return false }
-
-        // The copy/move runs in the background with a progress panel; reload
-        // and select once it lands.
+        // Refresh + report once the import lands.
         let nav = parent.nav
-        FileOperationService.shared.perform(ops, title: shouldMove ? "이동 중…" : "복사 중…") { [weak self] done, err in
-            let landed = done.map(\.dst)
-            if shouldMove {
-                UndoService.shared.register(.move(pairs: done.map { (from: $0.src, to: $0.dst) }),
-                                            label: "이동")
-            } else {
-                UndoService.shared.register(.create(urls: landed), label: "복사")
-            }
-            // If we dropped into the current folder, reload + select new items.
+        let finish: ([URL], Error?) -> Void = { [weak self] landed, err in
             if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
                 nav.reload(thenSelect: Set(landed))
             } else {
@@ -834,6 +764,36 @@ extension FileTableView.Coordinator: NSTableViewDataSource {
                 self?.alertError("드롭 실패", message: err.localizedDescription)
             }
         }
+
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        let urls = (pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL]) ?? []
+
+        // No real file URL → it's a promise drag (Outlook/Mail attachment,
+        // remote-desktop file, …). Ask the provider to write the files into a
+        // staging dir, then import those as a copy.
+        if urls.isEmpty {
+            let promises = DragImport.receivers(from: pb)
+            guard !promises.isEmpty else { return false }
+            DragImport.receive(promises) { resolved, staging in
+                guard !resolved.isEmpty else { try? FileManager.default.removeItem(at: staging); return }
+                importDroppedFiles(resolved, into: dst, move: false, cleanup: staging, completion: finish)
+            }
+            return true
+        }
+
+        // Real file URLs: move vs copy per modifiers / source.
+        // macOS convention: holding Option forces .copy; holding Cmd forces .move.
+        let mods = NSEvent.modifierFlags
+        let mask = info.draggingSourceOperationMask
+        let shouldMove: Bool = {
+            if mods.contains(.option) { return false }
+            if mods.contains(.command) { return true }
+            if mask.contains(.move) && !mask.contains(.copy) { return true }
+            // Within-app dragging defaults to move; from Finder defaults to copy.
+            return (info.draggingSource as? NSTableView) === tableView
+        }()
+
+        importDroppedFiles(urls, into: dst, move: shouldMove, cleanup: nil, completion: finish)
         return true
     }
 

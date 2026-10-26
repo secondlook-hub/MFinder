@@ -148,7 +148,9 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         outline.dataSource = context.coordinator
         outline.delegate = context.coordinator
 
-        outline.registerForDraggedTypes([.fileURL])
+        // File URLs plus file promises (Outlook/Mail attachments, remote-desktop
+        // files, …) so those can be dropped onto a folder row too.
+        outline.registerForDraggedTypes([.fileURL] + DragImport.draggedTypes)
         outline.setDraggingSourceOperationMask([.copy, .move, .link], forLocal: true)
         outline.setDraggingSourceOperationMask([.copy], forLocal: false)
 
@@ -1555,7 +1557,14 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
             // Dropping onto the AirDrop row sends the files (always a copy).
             if case .airdrop = node { return .copy }
             guard node.folderURL != nil else { return [] }
-            return NSEvent.modifierFlags.contains(.option) ? .copy : .move
+            // An external drag (Finder, Outlook/Mail attachment promises, …)
+            // usually offers .copy only — returning .move there would be outside
+            // the source mask and AppKit would reject the drop, so fall back to
+            // whatever the source actually allows.
+            let mask = info.draggingSourceOperationMask
+            if NSEvent.modifierFlags.contains(.option), mask.contains(.copy) { return .copy }
+            if mask.contains(.move) { return .move }
+            return mask.contains(.copy) ? .copy : []
         }
 
         func outlineView(_ outlineView: NSOutlineView,
@@ -1564,71 +1573,24 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                          childIndex index: Int) -> Bool {
             guard let node = item as? SidebarItem else { return false }
             let pb = info.draggingPasteboard
-            guard let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else { return false }
+            let urls = (pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
+            let promises = urls.isEmpty ? DragImport.receivers(from: pb) : []
+
+            // Dropping onto the AirDrop row sends the files.
             if case .airdrop = node {
-                airDropSend(urls)
+                if !urls.isEmpty { airDropSend(urls); return true }
+                guard !promises.isEmpty else { return false }
+                DragImport.receive(promises) { [weak self] resolved, staging in
+                    if !resolved.isEmpty { self?.airDropSend(resolved) }
+                    try? FileManager.default.removeItem(at: staging)
+                }
                 return true
             }
-            guard let dst = node.folderURL else { return false }
-            let shouldCopy = NSEvent.modifierFlags.contains(.option)
-            // Count overwrite conflicts up front so each dialog can offer a
-            // blanket answer for the rest (same UX as clipboard paste).
-            var conflictsLeft = urls.filter { src in
-                let stdSrc = src.standardizedFileURL
-                let stdDst = dst.standardizedFileURL
-                guard stdSrc != stdDst else { return false }
-                if !shouldCopy, stdSrc.deletingLastPathComponent() == stdDst { return false }
-                let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
-                return plainTarget.standardizedFileURL != stdSrc
-                    && FileManager.default.fileExists(atPath: plainTarget.path)
-            }.count
-            var blanket: FileConflictChoice?
-            var ops: [FileOperation] = []
-            for src in urls {
-                let stdSrc = src.standardizedFileURL
-                let stdDst = dst.standardizedFileURL
-                if stdSrc == stdDst { continue }
-                if !shouldCopy, stdSrc.deletingLastPathComponent() == stdDst { continue }
-                let plainTarget = dst.appendingPathComponent(src.lastPathComponent)
-                let target: URL
-                if plainTarget.standardizedFileURL == stdSrc {
-                    // Copy into its own parent → duplicate, never overwrite self.
-                    target = uniqueChildName(in: dst, base: src.lastPathComponent)
-                } else {
-                    // A same-named item at the destination prompts 덮어쓰기/건너뛰기/취소.
-                    if FileManager.default.fileExists(atPath: plainTarget.path) {
-                        conflictsLeft -= 1
-                        let choice = blanket ?? askFileConflict(name: src.lastPathComponent,
-                                                                remainingConflicts: conflictsLeft,
-                                                                blanket: &blanket)
-                        if choice == .skip { continue }
-                        if choice == .cancel { break }
-                        if choice == .keepBoth {
-                            ops.append(FileOperation(src: src,
-                                                     dst: uniqueChildName(in: dst, base: src.lastPathComponent),
-                                                     isMove: !shouldCopy))
-                            continue
-                        }
-                        try? FileManager.default.removeItem(at: plainTarget)
-                    }
-                    target = plainTarget
-                }
-                ops.append(FileOperation(src: src, dst: target, isMove: !shouldCopy))
-            }
-            guard !ops.isEmpty else { return false }
 
-            // Background copy/move with a progress panel; refresh tree + list
-            // once it lands.
+            guard let dst = node.folderURL else { return false }
             let nav = self.nav
             let tree = self.tree
-            FileOperationService.shared.perform(ops, title: shouldCopy ? "복사 중…" : "이동 중…") { [weak self] done, err in
-                let landed = done.map(\.dst)
-                if shouldCopy {
-                    UndoService.shared.register(.create(urls: landed), label: "복사")
-                } else {
-                    UndoService.shared.register(.move(pairs: done.map { (from: $0.src, to: $0.dst) }),
-                                                label: "이동")
-                }
+            let finish: ([URL], Error?) -> Void = { [weak self] landed, err in
                 tree.reloadChildren(of: dst)
                 if dst.standardizedFileURL == nav.currentURL.standardizedFileURL {
                     nav.reload(thenSelect: Set(landed))
@@ -1639,6 +1601,20 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
                     self?.presentAlert("드롭 실패", err.localizedDescription)
                 }
             }
+
+            // Promise drags (Outlook/Mail attachments, remote-desktop files, …)
+            // carry no real file URL — resolve into a staging dir, then copy in.
+            if urls.isEmpty {
+                guard !promises.isEmpty else { return false }
+                DragImport.receive(promises) { resolved, staging in
+                    guard !resolved.isEmpty else { try? FileManager.default.removeItem(at: staging); return }
+                    importDroppedFiles(resolved, into: dst, move: false, cleanup: staging, completion: finish)
+                }
+                return true
+            }
+
+            let shouldCopy = NSEvent.modifierFlags.contains(.option)
+            importDroppedFiles(urls, into: dst, move: !shouldCopy, cleanup: nil, completion: finish)
             return true
         }
 
