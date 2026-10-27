@@ -167,8 +167,13 @@ struct FileTableView: NSViewRepresentable {
         let groupChanged = coord.lastGroupField != nav.groupField
         let extChanged = coord.lastShowExtensions != uiState.showExtensions
         if extChanged { coord.lastShowExtensions = uiState.showExtensions }
+        // A tab switch swaps `nav` for a different NavigationState. Restored
+        // tabs each reload exactly once, so they share dataVersion == 1 and the
+        // version check alone wouldn't fire — key on the object identity too.
+        let navChanged = coord.lastNavID != ObjectIdentifier(nav)
+        if navChanged { coord.lastNavID = ObjectIdentifier(nav) }
         if coord.lastDataVersion != nav.dataVersion || searchStateChanged || cutSetChanged
-            || themeChanged || fontChanged || groupChanged || extChanged {
+            || themeChanged || fontChanged || groupChanged || extChanged || navChanged {
             coord.lastDataVersion = nav.dataVersion
             coord.lastGroupField = nav.groupField
             coord.items = nav.filteredItems
@@ -309,6 +314,11 @@ extension FileTableView {
         private(set) var rows: [TableRow] = []
         var lastGroupField: GroupField = .none
         var lastDataVersion: Int = -1
+        /// Identity of the NavigationState last shown. The Coordinator is reused
+        /// across tab switches, so a switch only changes `nav` (not necessarily
+        /// its dataVersion — restored tabs all load once and share version 1), and
+        /// we must force a reload when the underlying tab object itself changes.
+        var lastNavID: ObjectIdentifier? = nil
         var lastTheme: Theme? = nil
         var lastFontSize: CGFloat = -1
         var lastShowExtensions = true
