@@ -346,6 +346,16 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         }
 
         func outlineView(_ outlineView: NSOutlineView, shouldExpandItem item: Any) -> Bool {
+            // During a drag, veto AppKit's built-in spring-loading: only a
+            // folder our dwell timer has authorized may expand. This stops the
+            // tree from popping open under the pointer (and the expand/collapse
+            // flicker that fighting AppKit per-tick produced). The timer calls
+            // expandItem(_:) directly, which doesn't route through here.
+            if let node = item as? SidebarItem,
+               let ov = outlineView as? SidebarNSOutlineView,
+               !ov.springAllowsExpansion(of: node) {
+                return false
+            }
             // Load children synchronously *before* AppKit asks the data
             // source how many to display, so the expanded view shows the
             // correct rows on first paint instead of an empty branch.
@@ -1619,39 +1629,43 @@ final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
     private let springLoadDelay: TimeInterval = 1.2
     private var springTimer: Timer?
     private var springItem: SidebarItem?
-    /// Folders that may stay open during this drag — ones we expanded, plus
-    /// ones already open before the drag reached them.
+    /// Folders our dwell timer has authorized to expand during this drag.
     private var springAuthorized = Set<SidebarItem>()
+    /// True while a drag is over the tree. Used by the delegate's
+    /// `shouldExpandItem` to veto AppKit's built-in spring-loading so only our
+    /// dwell timer may reveal a folder (fighting AppKit per-tick caused flicker).
+    private(set) var isSpringDragging = false
+
+    /// Whether `item` may expand right now. Outside a drag, always. During a
+    /// drag, only once the dwell timer has authorized it.
+    func springAllowsExpansion(of item: SidebarItem) -> Bool {
+        !isSpringDragging || springAuthorized.contains(item)
+    }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        // Snapshot folders already open when the drag arrives — those may stay.
-        // Anything that opens *during* the drag must earn it via the dwell
-        // timer; everything else is swept closed each tick (see below).
-        snapshotAuthorizedExpanded()
+        // Mark the drag active so `shouldExpandItem` vetoes AppKit's built-in
+        // spring-loading; from here, only our dwell timer expands a folder.
+        isSpringDragging = true
+        springAuthorized.removeAll()
         return super.draggingEntered(sender)
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         let op = super.draggingUpdated(sender)
-
-        // AppKit's built-in spring-loading pops folders open after a short delay
-        // as the drag passes over them, which made the tree reflow faster than
-        // the pointer could aim. Undo any such early expansion every tick (these
-        // periodic updates fire even while the pointer is still), so ONLY our
-        // 1.2s dwell timer may reveal a folder.
-        collapseUnauthorizedExpanded()
-
         let point = convert(sender.draggingLocation, from: nil)
         let row = self.row(at: point)
         guard row >= 0,
               let item = self.item(atRow: row) as? SidebarItem,
               isExpandable(item),
+              !isItemExpanded(item),
               !springAuthorized.contains(item) else {
             cancelSpringTimer()
             return op
         }
         // Hovered collapsed folder that hasn't earned expansion yet: arm (or
-        // keep) the dwell timer. When it fires we authorize + expand it.
+        // keep) the dwell timer. When it fires we authorize + expand it. AppKit
+        // can't spring-load it in the meantime because `shouldExpandItem`
+        // returns false until it's authorized, so the tree stays still.
         if springItem != item {
             springItem = item
             springTimer?.invalidate()
@@ -1660,6 +1674,12 @@ final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
                 MainActor.assumeIsolated {
                     guard let self = self, let target = self.springItem else { return }
                     self.springAuthorized.insert(target)
+                    // Load children first — expandItem(_:) bypasses the
+                    // delegate's shouldExpandItem preload, so without this the
+                    // branch could paint empty.
+                    if let treeNode = target.treeNode {
+                        self.coordinator?.tree.expand(treeNode)
+                    }
                     self.expandItem(target)
                     self.springTimer = nil
                 }
@@ -1668,44 +1688,20 @@ final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
         return op
     }
 
-    /// Records every currently-expanded folder as authorized, so folders the
-    /// user had already opened aren't swept closed when a drag begins.
-    private func snapshotAuthorizedExpanded() {
-        springAuthorized.removeAll()
-        for r in 0..<numberOfRows {
-            if let it = item(atRow: r) as? SidebarItem,
-               isExpandable(it), isItemExpanded(it) {
-                springAuthorized.insert(it)
-            }
-        }
-    }
-
-    /// Collapses any expanded folder not in `springAuthorized` — i.e. one AppKit
-    /// spring-loaded open before our dwell timer authorized it.
-    private func collapseUnauthorizedExpanded() {
-        var r = 0
-        while r < numberOfRows {
-            if let it = item(atRow: r) as? SidebarItem,
-               isExpandable(it), isItemExpanded(it),
-               !springAuthorized.contains(it) {
-                collapseItem(it)
-                // Row count shrank; re-check this index without advancing.
-            } else {
-                r += 1
-            }
-        }
-    }
-
     override func draggingExited(_ sender: NSDraggingInfo?) {
-        cancelSpringTimer()
-        springAuthorized.removeAll()
+        endSpringDrag()
         super.draggingExited(sender)
     }
 
     override func concludeDragOperation(_ sender: NSDraggingInfo?) {
+        endSpringDrag()
+        super.concludeDragOperation(sender)
+    }
+
+    private func endSpringDrag() {
         cancelSpringTimer()
         springAuthorized.removeAll()
-        super.concludeDragOperation(sender)
+        isSpringDragging = false
     }
 
     private func cancelSpringTimer() {
