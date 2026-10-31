@@ -295,6 +295,11 @@ struct FileListView: View {
         Button(L("열기")) { targets.forEach { url in openURL(url) } }
             .keyboardShortcut(.return, modifiers: [])
 
+        // Package (app bundle, etc.): 열기 launches it, so offer "패키지 내용 보기".
+        if FileSystemService.shared.isPackage(item.url) {
+            Button(L("패키지 내용 보기")) { nav.navigate(to: item.url) }
+        }
+
         if item.isDirectory {
             Button(L("새 탭에서 열기")) {
                 NotificationCenter.default.post(name: .mfinderNewTab, object: item.url)
@@ -621,10 +626,10 @@ struct FileListView: View {
     }
 
     private func openURL(_ url: URL) {
-        if let item = nav.items.first(where: { $0.url == url }), item.isDirectory {
-            nav.navigate(to: url)
-        } else {
-            FileSystemService.shared.openItem(url)
+        switch FileSystemService.shared.openAction(for: url) {
+        case .navigate(let target):  nav.navigate(to: target)
+        case .openFile(let target):  FileSystemService.shared.openItem(target)
+        case .broken:                FileSystemService.shared.openItem(url)
         }
     }
 
@@ -895,29 +900,7 @@ struct FileListView: View {
     // MARK: - Folder properties
 
     private func showFolderProperties(_ url: URL) {
-        let alert = NSAlert()
-        alert.messageText = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
-        var lines: [String] = []
-        lines.append(L("종류: 폴더"))
-        lines.append(Lf("경로: %@", "\(url.path)"))
-        if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            if let m = values.contentModificationDate {
-                lines.append(Lf("수정한 날짜: %@", "\(f.string(from: m))"))
-            }
-            if let c = values.creationDate {
-                lines.append(Lf("만든 날짜: %@", "\(f.string(from: c))"))
-            }
-        }
-        let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path).count) ?? 0
-        lines.append(Lf("항목 수: %@", "\(count)"))
-        alert.informativeText = lines.joined(separator: "\n")
-        alert.addButton(withTitle: L("확인"))
-        alert.addButton(withTitle: L("Finder에서 보기"))
-        if alert.runModal() == .alertSecondButtonReturn {
-            FileSystemService.shared.revealInFinder(url)
-        }
+        InfoWindowController.show(for: url)
     }
 
     // MARK: - Alert helpers
@@ -989,22 +972,7 @@ struct FileListView: View {
     }
 
     private func showProperties(_ item: FileItem) {
-        let alert = NSAlert()
-        alert.messageText = item.name
-        var lines: [String] = []
-        lines.append(Lf("종류: %@", "\(item.typeDescription)"))
-        lines.append(Lf("경로: %@", "\(item.url.path)"))
-        if !item.isDirectory {
-            lines.append(Lf("크기: %@", "\(item.sizeString)"))
-        }
-        lines.append(Lf("수정한 날짜: %@", "\(item.modificationString)"))
-        alert.informativeText = lines.joined(separator: "\n")
-        alert.icon = item.icon
-        alert.addButton(withTitle: L("확인"))
-        alert.addButton(withTitle: L("Finder에서 보기"))
-        if alert.runModal() == .alertSecondButtonReturn {
-            FileSystemService.shared.revealInFinder(item.url)
-        }
+        InfoWindowController.show(for: item.url)
     }
 
     private func createNewFolder() {

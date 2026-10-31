@@ -374,17 +374,7 @@ struct CommandBar: View {
     }
 
     private func showCurrentFolderProperties() {
-        let url = nav.currentURL
-        let alert = NSAlert()
-        alert.messageText = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
-        var lines: [String] = []
-        lines.append(L("종류: 폴더"))
-        lines.append(Lf("경로: %@", "\(url.path)"))
-        let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path).count) ?? 0
-        lines.append(Lf("항목 수: %@", "\(count)"))
-        alert.informativeText = lines.joined(separator: "\n")
-        alert.addButton(withTitle: L("확인"))
-        alert.runModal()
+        InfoWindowController.show(for: nav.currentURL)
     }
 }
 

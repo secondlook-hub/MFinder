@@ -208,7 +208,7 @@ final class FileSystemService {
     /// macOS hand the URL off to Finder).
     func openAction(for url: URL) -> OpenAction {
         let keys: Set<URLResourceKey> = [
-            .isSymbolicLinkKey, .isAliasFileKey, .isDirectoryKey
+            .isSymbolicLinkKey, .isAliasFileKey, .isDirectoryKey, .isPackageKey
         ]
         let values = try? url.resourceValues(forKeys: keys)
 
@@ -230,11 +230,21 @@ final class FileSystemService {
             return .broken(url)
         }
 
-        // Plain item — use the URL's own type.
-        if values?.isDirectory == true {
+        // Plain item — use the URL's own type. A directory that is also a
+        // package (an app bundle, .bundle/.framework, document packages, …) is
+        // treated like a file: double-click launches/opens it, matching Finder.
+        // Browsing inside is the explicit "패키지 내용 보기" action.
+        if values?.isDirectory == true && values?.isPackage != true {
             return .navigate(url)
         }
         return .openFile(url)
+    }
+
+    /// True when `url` is a directory macOS treats as a package/bundle (app,
+    /// .bundle, .framework, document packages, …). Used to decide whether
+    /// double-click launches vs navigates, and to offer "패키지 내용 보기".
+    func isPackage(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage ?? false
     }
 
     /// Classifies a resolved URL as navigable (folder) or openable (file).
@@ -244,7 +254,12 @@ final class FileSystemService {
         let std = url.standardizedFileURL
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: std.path, isDirectory: &isDir) else { return nil }
-        return isDir.boolValue ? .navigate(std) : .openFile(std)
+        if isDir.boolValue {
+            // A package directory (app bundle etc.) opens rather than navigates.
+            let isPkg = (try? std.resourceValues(forKeys: [.isPackageKey]))?.isPackage ?? false
+            return isPkg ? .openFile(std) : .navigate(std)
+        }
+        return .openFile(std)
     }
 
     func revealInFinder(_ url: URL) {

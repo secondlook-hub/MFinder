@@ -1275,15 +1275,23 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     private func buildFileMenu(_ menu: NSMenu, target: FileItem, urls: [URL]) {
         let nav = parent.nav
 
-        menu.addItem(block("열기") { [weak self] in
+        menu.addItem(block("열기") {
             urls.forEach { url in
-                if let item = self?.items.first(where: { $0.url == url }), item.isDirectory {
-                    nav.navigate(to: url)
-                } else {
-                    FileSystemService.shared.openItem(url)
+                switch FileSystemService.shared.openAction(for: url) {
+                case .navigate(let t):  nav.navigate(to: t)
+                case .openFile(let t):  FileSystemService.shared.openItem(t)
+                case .broken:           FileSystemService.shared.openItem(url)
                 }
             }
         })
+
+        // Package (app bundle, etc.): double-click / 열기 now launches it, so
+        // offer Finder's "패키지 내용 보기" to browse inside.
+        if FileSystemService.shared.isPackage(target.url) {
+            menu.addItem(block("패키지 내용 보기") {
+                nav.navigate(to: target.url)
+            })
+        }
 
         if target.isDirectory {
             menu.addItem(block("새 탭에서 열기") {
@@ -2137,39 +2145,11 @@ extension FileTableView.Coordinator: NSMenuDelegate {
     }
 
     private func showProperties(_ item: FileItem) {
-        let alert = NSAlert()
-        alert.messageText = item.name
-        var lines: [String] = []
-        lines.append(Lf("종류: %@", "\(item.typeDescription)"))
-        lines.append(Lf("경로: %@", "\(item.url.path)"))
-        if !item.isDirectory { lines.append(Lf("크기: %@", "\(item.sizeString)")) }
-        lines.append(Lf("수정한 날짜: %@", "\(item.modificationString)"))
-        alert.informativeText = lines.joined(separator: "\n")
-        alert.icon = item.icon
-        alert.addButton(withTitle: L("확인"))
-        alert.addButton(withTitle: L("Finder에서 보기"))
-        if alert.runModal() == .alertSecondButtonReturn {
-            FileSystemService.shared.revealInFinder(item.url)
-        }
+        InfoWindowController.show(for: item.url)
     }
 
     private func showFolderProperties(_ url: URL) {
-        let alert = NSAlert()
-        alert.messageText = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
-        var lines: [String] = []
-        lines.append(L("종류: 폴더"))
-        lines.append(Lf("경로: %@", "\(url.path)"))
-        if let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            if let m = vals.contentModificationDate { lines.append(Lf("수정한 날짜: %@", "\(f.string(from: m))")) }
-            if let c = vals.creationDate { lines.append(Lf("만든 날짜: %@", "\(f.string(from: c))")) }
-        }
-        let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path).count) ?? 0
-        lines.append(Lf("항목 수: %@", "\(count)"))
-        alert.informativeText = lines.joined(separator: "\n")
-        alert.addButton(withTitle: L("확인"))
-        alert.runModal()
+        InfoWindowController.show(for: url)
     }
 
     private func alertError(_ title: String, message: String) {

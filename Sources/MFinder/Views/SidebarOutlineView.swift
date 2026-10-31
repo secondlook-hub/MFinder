@@ -1387,84 +1387,7 @@ struct SidebarOutlineRepresentable: NSViewRepresentable {
         // MARK: - Properties dialog
 
         private func showProperties(for url: URL) {
-            let alert = NSAlert()
-            alert.messageText = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
-            alert.icon = NSWorkspace.shared.icon(forFile: url.path)
-
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            var creationStr = "-"
-            var modStr = "-"
-            if let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
-                if let c = vals.creationDate { creationStr = f.string(from: c) }
-                if let m = vals.contentModificationDate { modStr = f.string(from: m) }
-            }
-
-            func keyField(_ s: String) -> NSTextField {
-                let tf = NSTextField(labelWithString: L(s))
-                tf.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-                tf.textColor = .secondaryLabelColor
-                return tf
-            }
-            func valueField(_ s: String) -> NSTextField {
-                let tf = NSTextField(labelWithString: L(s))
-                tf.font = NSFont.systemFont(ofSize: 12)
-                tf.isSelectable = true
-                return tf
-            }
-
-            let sizeValue = valueField("계산 중…")
-            let grid = NSGridView(views: [
-                [keyField("만든 날짜:"),  valueField(creationStr)],
-                [keyField("수정한 날짜:"), valueField(modStr)],
-                [keyField("크기:"),       sizeValue]
-            ])
-            grid.translatesAutoresizingMaskIntoConstraints = false
-            grid.rowSpacing = 6
-            grid.columnSpacing = 10
-            grid.column(at: 0).xPlacement = .trailing
-
-            let fit = grid.fittingSize
-            grid.frame = NSRect(origin: .zero,
-                                size: NSSize(width: max(fit.width, 320), height: fit.height))
-            alert.accessoryView = grid
-            alert.addButton(withTitle: L("확인"))
-
-            // Folder sizes can be expensive; compute off the main thread and
-            // patch the label when the value lands. NSAlert's modal run loop
-            // keeps processing main-queue dispatches, so the live update works.
-            DispatchQueue.global(qos: .userInitiated).async { [weak sizeValue] in
-                let bytes = SidebarOutlineRepresentable.Coordinator.totalSize(at: url)
-                let str = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-                DispatchQueue.main.async {
-                    sizeValue?.stringValue = str
-                }
-            }
-
-            alert.runModal()
-        }
-
-        nonisolated private static func totalSize(at url: URL) -> Int64 {
-            let fm = FileManager.default
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            if !isDir {
-                let v = try? url.resourceValues(forKeys: [.fileSizeKey])
-                return Int64(v?.fileSize ?? 0)
-            }
-            guard let en = fm.enumerator(
-                at: url,
-                includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
-                options: [.skipsPackageDescendants],
-                errorHandler: nil
-            ) else { return 0 }
-            var total: Int64 = 0
-            for case let fileURL as URL in en {
-                guard let vals = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                      vals.isRegularFile == true,
-                      let size = vals.fileSize else { continue }
-                total += Int64(size)
-            }
-            return total
+            InfoWindowController.show(for: url)
         }
 
         /// True if `url` is a mounted volume that can be unmounted/ejected —
@@ -1700,32 +1623,35 @@ final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
     /// ones already open before the drag reached them.
     private var springAuthorized = Set<SidebarItem>()
 
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        // Snapshot folders already open when the drag arrives — those may stay.
+        // Anything that opens *during* the drag must earn it via the dwell
+        // timer; everything else is swept closed each tick (see below).
+        snapshotAuthorizedExpanded()
+        return super.draggingEntered(sender)
+    }
+
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         let op = super.draggingUpdated(sender)
+
+        // AppKit's built-in spring-loading pops folders open after a short delay
+        // as the drag passes over them, which made the tree reflow faster than
+        // the pointer could aim. Undo any such early expansion every tick (these
+        // periodic updates fire even while the pointer is still), so ONLY our
+        // 1.2s dwell timer may reveal a folder.
+        collapseUnauthorizedExpanded()
+
         let point = convert(sender.draggingLocation, from: nil)
         let row = self.row(at: point)
         guard row >= 0,
               let item = self.item(atRow: row) as? SidebarItem,
-              isExpandable(item) else {
+              isExpandable(item),
+              !springAuthorized.contains(item) else {
             cancelSpringTimer()
             return op
         }
-        if springAuthorized.contains(item) {
-            if springItem != item { cancelSpringTimer() }
-            return op
-        }
-        if isItemExpanded(item) {
-            if springItem == item {
-                // AppKit's own spring-load fired early — undo it; our timer owns
-                // the timing.
-                collapseItem(item)
-            } else {
-                // Folder was already open before the drag reached it: leave it.
-                springAuthorized.insert(item)
-                cancelSpringTimer()
-                return op
-            }
-        }
+        // Hovered collapsed folder that hasn't earned expansion yet: arm (or
+        // keep) the dwell timer. When it fires we authorize + expand it.
         if springItem != item {
             springItem = item
             springTimer?.invalidate()
@@ -1740,6 +1666,34 @@ final class SidebarNSOutlineView: NSOutlineView, NSMenuItemValidation {
             }
         }
         return op
+    }
+
+    /// Records every currently-expanded folder as authorized, so folders the
+    /// user had already opened aren't swept closed when a drag begins.
+    private func snapshotAuthorizedExpanded() {
+        springAuthorized.removeAll()
+        for r in 0..<numberOfRows {
+            if let it = item(atRow: r) as? SidebarItem,
+               isExpandable(it), isItemExpanded(it) {
+                springAuthorized.insert(it)
+            }
+        }
+    }
+
+    /// Collapses any expanded folder not in `springAuthorized` — i.e. one AppKit
+    /// spring-loaded open before our dwell timer authorized it.
+    private func collapseUnauthorizedExpanded() {
+        var r = 0
+        while r < numberOfRows {
+            if let it = item(atRow: r) as? SidebarItem,
+               isExpandable(it), isItemExpanded(it),
+               !springAuthorized.contains(it) {
+                collapseItem(it)
+                // Row count shrank; re-check this index without advancing.
+            } else {
+                r += 1
+            }
+        }
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {

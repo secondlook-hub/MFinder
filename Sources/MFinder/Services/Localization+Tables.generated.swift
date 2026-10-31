@@ -5,6 +5,12 @@ import Foundation
 
 extension LocalizationTables {
     static let en: [String: String] = [
+        "종류:": "Kind:",
+        "위치:": "Where:",
+        "일반 정보:": "General:",
+        "버전:": "Version:",
+        "%@ 정보": "%@ Info",
+        "패키지 내용 보기": "Show Package Contents",
         "PDF 만들기": "Create PDF",
         "PDF 만들기 실패": "Failed to create PDF",
         "검색 저장": "Save Search",
@@ -460,6 +466,12 @@ extension LocalizationTables {
     ]
 
     static let ja: [String: String] = [
+        "종류:": "種類:",
+        "위치:": "場所:",
+        "일반 정보:": "一般情報:",
+        "버전:": "バージョン:",
+        "%@ 정보": "%@ の情報",
+        "패키지 내용 보기": "パッケージの内容を表示",
         "PDF 만들기": "PDFを作成",
         "PDF 만들기 실패": "PDFの作成に失敗",
         "검색 저장": "検索を保存",
@@ -915,6 +927,12 @@ extension LocalizationTables {
     ]
 
     static let zhHans: [String: String] = [
+        "종류:": "种类：",
+        "위치:": "位置：",
+        "일반 정보:": "通用信息：",
+        "버전:": "版本：",
+        "%@ 정보": "%@ 简介",
+        "패키지 내용 보기": "显示包内容",
         "PDF 만들기": "创建 PDF",
         "PDF 만들기 실패": "创建 PDF 失败",
         "검색 저장": "存储搜索",
@@ -1370,6 +1388,12 @@ extension LocalizationTables {
     ]
 
     static let zhHant: [String: String] = [
+        "종류:": "種類：",
+        "위치:": "位置：",
+        "일반 정보:": "一般資訊：",
+        "버전:": "版本：",
+        "%@ 정보": "%@ 簡介",
+        "패키지 내용 보기": "顯示套件內容",
         "PDF 만들기": "製作 PDF",
         "PDF 만들기 실패": "製作 PDF 失敗",
         "검색 저장": "儲存搜尋",
@@ -1825,6 +1849,12 @@ extension LocalizationTables {
     ]
 
     static let es: [String: String] = [
+        "종류:": "Tipo:",
+        "위치:": "Ubicación:",
+        "일반 정보:": "General:",
+        "버전:": "Versión:",
+        "%@ 정보": "Información de %@",
+        "패키지 내용 보기": "Mostrar contenido del paquete",
         "PDF 만들기": "Crear PDF",
         "PDF 만들기 실패": "Error al crear PDF",
         "검색 저장": "Guardar búsqueda",
@@ -2280,6 +2310,12 @@ extension LocalizationTables {
     ]
 
     static let fr: [String: String] = [
+        "종류:": "Type :",
+        "위치:": "Emplacement :",
+        "일반 정보:": "Général :",
+        "버전:": "Version :",
+        "%@ 정보": "%@ — Infos",
+        "패키지 내용 보기": "Afficher le contenu du paquet",
         "PDF 만들기": "Créer un PDF",
         "PDF 만들기 실패": "Échec de création du PDF",
         "검색 저장": "Enregistrer la recherche",
@@ -2735,6 +2771,12 @@ extension LocalizationTables {
     ]
 
     static let de: [String: String] = [
+        "종류:": "Art:",
+        "위치:": "Ort:",
+        "일반 정보:": "Allgemein:",
+        "버전:": "Version:",
+        "%@ 정보": "%@ – Informationen",
+        "패키지 내용 보기": "Paketinhalt zeigen",
         "PDF 만들기": "PDF erstellen",
         "PDF 만들기 실패": "PDF-Erstellung fehlgeschlagen",
         "검색 저장": "Suche sichern",
@@ -3190,6 +3232,12 @@ extension LocalizationTables {
     ]
 
     static let it: [String: String] = [
+        "종류:": "Tipo:",
+        "위치:": "Posizione:",
+        "일반 정보:": "Generali:",
+        "버전:": "Versione:",
+        "%@ 정보": "%@ Info",
+        "패키지 내용 보기": "Mostra contenuto pacchetto",
         "PDF 만들기": "Crea PDF",
         "PDF 만들기 실패": "Creazione PDF non riuscita",
         "검색 저장": "Salva ricerca",
@@ -3645,6 +3693,12 @@ extension LocalizationTables {
     ]
 
     static let ptBR: [String: String] = [
+        "종류:": "Tipo:",
+        "위치:": "Onde:",
+        "일반 정보:": "Geral:",
+        "버전:": "Versão:",
+        "%@ 정보": "Informações de %@",
+        "패키지 내용 보기": "Mostrar Conteúdo do Pacote",
         "PDF 만들기": "Criar PDF",
         "PDF 만들기 실패": "Falha ao criar PDF",
         "검색 저장": "Salvar busca",
@@ -4100,6 +4154,12 @@ extension LocalizationTables {
     ]
 
     static let ru: [String: String] = [
+        "종류:": "Тип:",
+        "위치:": "Размещение:",
+        "일반 정보:": "Основные:",
+        "버전:": "Версия:",
+        "%@ 정보": "%@ — свойства",
+        "패키지 내용 보기": "Показать содержимое пакета",
         "PDF 만들기": "Создать PDF",
         "PDF 만들기 실패": "Не удалось создать PDF",
         "검색 저장": "Сохранить поиск",
@@ -4555,6 +4615,12 @@ extension LocalizationTables {
     ]
 
     static let nl: [String: String] = [
+        "종류:": "Soort:",
+        "위치:": "Locatie:",
+        "일반 정보:": "Algemeen:",
+        "버전:": "Versie:",
+        "%@ 정보": "%@ – info",
+        "패키지 내용 보기": "Toon pakketinhoud",
         "PDF 만들기": "PDF aanmaken",
         "PDF 만들기 실패": "PDF aanmaken mislukt",
         "검색 저장": "Zoekopdracht bewaren",
@@ -5010,6 +5076,12 @@ extension LocalizationTables {
     ]
 
     static let pl: [String: String] = [
+        "종류:": "Rodzaj:",
+        "위치:": "Lokalizacja:",
+        "일반 정보:": "Ogólne:",
+        "버전:": "Wersja:",
+        "%@ 정보": "%@ — informacje",
+        "패키지 내용 보기": "Pokaż zawartość pakietu",
         "PDF 만들기": "Utwórz PDF",
         "PDF 만들기 실패": "Nie udało się utworzyć PDF",
         "검색 저장": "Zapisz wyszukiwanie",
@@ -5465,6 +5537,12 @@ extension LocalizationTables {
     ]
 
     static let tr: [String: String] = [
+        "종류:": "Tür:",
+        "위치:": "Konum:",
+        "일반 정보:": "Genel:",
+        "버전:": "Sürüm:",
+        "%@ 정보": "%@ Bilgisi",
+        "패키지 내용 보기": "Paket İçeriğini Göster",
         "PDF 만들기": "PDF Oluştur",
         "PDF 만들기 실패": "PDF oluşturulamadı",
         "검색 저장": "Aramayı Kaydet",
@@ -5920,6 +5998,12 @@ extension LocalizationTables {
     ]
 
     static let vi: [String: String] = [
+        "종류:": "Loại:",
+        "위치:": "Vị trí:",
+        "일반 정보:": "Chung:",
+        "버전:": "Phiên bản:",
+        "%@ 정보": "Thông tin %@",
+        "패키지 내용 보기": "Hiển thị nội dung gói",
         "PDF 만들기": "Tạo PDF",
         "PDF 만들기 실패": "Tạo PDF thất bại",
         "검색 저장": "Lưu tìm kiếm",
@@ -6375,6 +6459,12 @@ extension LocalizationTables {
     ]
 
     static let idn: [String: String] = [
+        "종류:": "Jenis:",
+        "위치:": "Lokasi:",
+        "일반 정보:": "Umum:",
+        "버전:": "Versi:",
+        "%@ 정보": "Info %@",
+        "패키지 내용 보기": "Tampilkan Isi Paket",
         "PDF 만들기": "Buat PDF",
         "PDF 만들기 실패": "Gagal membuat PDF",
         "검색 저장": "Simpan Pencarian",
@@ -6830,6 +6920,12 @@ extension LocalizationTables {
     ]
 
     static let ar: [String: String] = [
+        "종류:": "النوع:",
+        "위치:": "الموقع:",
+        "일반 정보:": "عام:",
+        "버전:": "الإصدار:",
+        "%@ 정보": "معلومات %@",
+        "패키지 내용 보기": "إظهار محتويات الحزمة",
         "PDF 만들기": "إنشاء PDF",
         "PDF 만들기 실패": "فشل إنشاء PDF",
         "검색 저장": "حفظ البحث",
@@ -7285,6 +7381,12 @@ extension LocalizationTables {
     ]
 
     static let hi: [String: String] = [
+        "종류:": "प्रकार:",
+        "위치:": "स्थान:",
+        "일반 정보:": "सामान्य:",
+        "버전:": "संस्करण:",
+        "%@ 정보": "%@ जानकारी",
+        "패키지 내용 보기": "पैकेज सामग्री दिखाएँ",
         "PDF 만들기": "PDF बनाएँ",
         "PDF 만들기 실패": "PDF बनाने में विफल",
         "검색 저장": "खोज सहेजें",
