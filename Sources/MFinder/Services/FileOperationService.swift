@@ -327,6 +327,12 @@ private final class FileProgressPanel: NSObject {
         panel.title = title
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
+        // A `.utilityWindow` panel defaults to hidesOnDeactivate = true, so it
+        // VANISHES the moment MFinder loses focus (the reported bug). Keep it
+        // on screen across app switches, and float it above other apps' windows
+        // so it stays visible even while a copy runs in the background.
+        panel.hidesOnDeactivate = false
+        panel.level = .floating
 
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .boldSystemFont(ofSize: 13)
@@ -348,11 +354,21 @@ private final class FileProgressPanel: NSObject {
         cancelButton.target = self
         cancelButton.action = #selector(cancelPressed(_:))
 
+        // 숨기기 dismisses the panel while the copy/move keeps running in the
+        // background; it just orders the window out (no cancel).
+        let hideButton = NSButton(title: L("숨기기"), target: nil, action: nil)
+        hideButton.target = self
+        hideButton.action = #selector(hidePressed(_:))
+
         let infoRow = NSStackView(views: [itemLabel, NSView(), countLabel])
         infoRow.orientation = .horizontal
         infoRow.distribution = .fill
 
-        let stack = NSStackView(views: [titleLabel, bar, infoRow, detailLabel, cancelButton])
+        let buttonRow = NSStackView(views: [NSView(), hideButton, cancelButton])
+        buttonRow.orientation = .horizontal
+        buttonRow.distribution = .fill
+
+        let stack = NSStackView(views: [titleLabel, bar, infoRow, detailLabel, buttonRow])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -360,16 +376,27 @@ private final class FileProgressPanel: NSObject {
         bar.widthAnchor.constraint(equalToConstant: 388).isActive = true
         infoRow.widthAnchor.constraint(equalTo: bar.widthAnchor).isActive = true
         stack.setCustomSpacing(10, after: infoRow)
+        buttonRow.widthAnchor.constraint(equalTo: bar.widthAnchor).isActive = true
 
         panel.contentView = stack
         panel.center()
     }
 
+    /// Once the user hides the panel it must not pop back up when the delayed
+    /// show() fires or on later updates — the operation finishes silently.
+    private var userHidden = false
+
     @objc private func cancelPressed(_ sender: Any?) {
         onCancel()
     }
 
+    @objc private func hidePressed(_ sender: Any?) {
+        userHidden = true
+        panel.orderOut(nil)
+    }
+
     func show() {
+        guard !userHidden else { return }
         panel.orderFrontRegardless()
     }
 
